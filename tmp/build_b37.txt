@@ -1,0 +1,12 @@
+﻿transforming...
+✓ 2 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/index.cjs  2.00 kB │ gzip: 0.56 kB
+
+[32m✓ built in 10ms[39m
+npm notice
+npm notice New major version of npm available! 10.9.8 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice

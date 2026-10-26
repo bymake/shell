@@ -1,0 +1,38 @@
+# ShellPro 打包配置（electron-builder）
+appId: com.shellpro.app
+productName: ShellPro
+electronLanguages:
+  - zh-CN
+  - en-US
+compression: maximum
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - dist-electron/**
+asar: true
+# 绿色版：不触发原生模块重编译（node:sqlite 免编译；ssh2 纯 JS）
+npmRebuild: false
+asarUnpack:
+  - "**/*.node"
+win:
+  target:
+    # 绿色版：单文件 portable（免安装）+ dir（免安装目录）
+    - target: portable
+      arch:
+        - x64
+    - target: dir
+      arch:
+        - x64
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  maintainer: ShellPro

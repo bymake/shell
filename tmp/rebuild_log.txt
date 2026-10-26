@@ -1,0 +1,22 @@
+﻿
+> shellpro@0.1.0 rebuild
+> electron-builder install-app-deps
+
+  • electron-builder  version=26.18.0
+  • loaded configuration  file=D:\github\shell\client\electron-builder.yml
+  • executing @electron/rebuild  electronVersion=45.0.0 arch=x64 buildFromSource=false workspaceRoot=D:\github\shell\client projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • preparing       moduleName=better-sqlite3 arch=x64
+  ⨯ 
+Error: Could not find any Visual Studio installation to use
+    at VisualStudioFinder.fail (D:\github\shell\client\node_modules\node-gyp\lib\find-visualstudio.js:118:11)
+    at VisualStudioFinder.findVisualStudio (D:\github\shell\client\node_modules\node-gyp\lib\find-visualstudio.js:74:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async createBuildDir (D:\github\shell\client\node_modules\node-gyp\lib\configure.js:112:18)
+    at async process.<anonymous> (file:///D:/github/shell/client/node_modules/@electron/rebuild/lib/module-type/node-gyp/worker.js:22:13)
+
+
+  ⨯ node-gyp failed to rebuild 'D:\github\shell\client\node_modules\better-sqlite3'  failedTask=installAppDeps stackTrace=Error: node-gyp failed to rebuild 'D:\github\shell\client\node_modules\better-sqlite3'
+    at ChildProcess.<anonymous> (file:///D:/github/shell/client/node_modules/@electron/rebuild/lib/module-type/node-gyp/node-gyp.js:120:24)
+    at ChildProcess.emit (node:events:519:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:293:12)

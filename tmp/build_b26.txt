@@ -1,0 +1,46 @@
+﻿
+> shellpro@0.1.0 build
+> tsc -b && vite build
+
+node.exe : [33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned t
+o become the default in a future major version of Vite:
+所在位置 行:1 字符: 1
++ & "C:\Users\Administrator\AppData\Local\Doubao\User Data\sandbox_runt ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([33m(!) Your V...ersion of Vite::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  - `__dirname` (vite.config.ts:39:24). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 625 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.46 kB │ gzip:   0.30 kB
+dist/assets/index-SYATGN24.css     20.27 kB │ gzip:   4.25 kB
+dist/assets/index-BUp_tzum.js   1,703.49 kB │ gzip: 533.30 kB
+
+[32m✓ built in 1.37s[39m
+[33m[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeS
+plitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 8 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/index.js  19.95 kB │ gzip: 6.96 kB
+
+[32m✓ built in 17ms[39m
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 2 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/index.cjs  2.00 kB │ gzip: 0.56 kB
+
+[32m✓ built in 10ms[39m

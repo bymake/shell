@@ -1,0 +1,10 @@
+﻿=== register ===
+register user=t3@t.com tokenLen=164
+=== login ===
+login ok tokenLen=164
+=== sync push ===
+push accepted=1
+=== sync changes ===
+changes count=1 serverTime=2026-10-25T06:00:00Z
+=== license verify (bad) ===
+bad license rejected: 403

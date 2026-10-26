@@ -1,0 +1,5 @@
+﻿
+> shellpro@0.1.0 build
+> tsc -b && vite build
+
+src/renderer/components/Terminal.tsx(77,11): error TS2367: This comparison appears to be unintentional because the types '"echo" | "path" | "pass"' and '"idle"' have no overlap.

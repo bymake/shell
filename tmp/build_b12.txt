@@ -1,0 +1,7 @@
+﻿
+> shellpro@0.1.0 build
+> tsc -b && vite build
+
+src/renderer/components/SftpPanel.tsx(8,43): error TS6133: 'useRef' is declared but its value is never read.
+src/renderer/state/sessionStore.ts(50,53): error TS6133: 'get' is declared but its value is never read.
+src/main/monitor/index.ts(10,7): error TS6133: 'log' is declared but its value is never read.

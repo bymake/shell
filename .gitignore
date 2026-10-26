@@ -1,0 +1,27 @@
+# 依赖
+node_modules/
+dist/
+dist-electron/
+release/
+*.log
+
+# 原生模块编译中间产物
+build/
+prebuilds/
+
+# Go 构建产物
+cloud/bin/
+cloud/cloud-api
+*.exe
+
+# 数据库与密钥（本地）
+*.db
+*.db-wal
+*.db-shm
+.env
+*.pem
+*.key
+
+# 系统
+.DS_Store
+Thumbs.db
