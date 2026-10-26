@@ -1,11 +1,11 @@
 /**
- * ShellPro 应用外壳
- * - 左侧会话侧栏（快速连接 + 监控面板）
- * - 右侧主区：SSH 终端(上) + SFTP 文件面板(下)，可拖拽分栏
- * - 菜单「文件→新建连接」打开连接管理器弹窗
+ * ShellPro app shell
+ * - Left: monitor sidebar (sync status / system / processes / network)
+ * - Right: SSH terminal (top) + SFTP file panel (bottom), draggable divider
+ * - Tool menu (custom title bar) opens the connection manager modal
  */
 import { useEffect, useRef, useState } from 'react'
-import { SessionSidebar } from './components/SessionSidebar'
+import { MonitorSidebar } from './components/MonitorSidebar'
 import { TerminalView } from './components/Terminal'
 import { SftpPanel } from './components/SftpPanel'
 import { ConnManager } from './components/ConnManager'
@@ -23,7 +23,7 @@ function App() {
 
   const [managerOpen, setManagerOpen] = useState(false)
   const [toolOpen, setToolOpen] = useState(false)
-  const [ratio, setRatio] = useState(62) // SSH 区占比 %
+  const [ratio, setRatio] = useState(62) // SSH area percentage
   const containerRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
 
@@ -31,13 +31,7 @@ function App() {
     void loadSessions()
   }, [loadSessions])
 
-  // 菜单「文件 → 新建连接」→ 打开连接管理器
-  useEffect(() => {
-    const off = window.shellpro.menu.onNewConnect(() => setManagerOpen(true))
-    return off
-  }, [])
-
-  // 拖拽分栏
+  // Draggable split divider
   const onDividerDown = (e: React.MouseEvent) => {
     e.preventDefault()
     dragging.current = true
@@ -58,7 +52,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      {/* 自定义标题栏：图标 + 工具菜单 + 拖动区 + 窗口控制 */}
+      {/* Custom title bar: icon + tools menu + drag area + window controls */}
       <div className="titlebar">
         <div className="tb-icon">˃_</div>
         <div className="tb-menu">
@@ -125,7 +119,7 @@ function App() {
       </div>
 
       <div className="app-body">
-        <SessionSidebar onOpenManager={() => setManagerOpen(true)} />
+        <MonitorSidebar onOpenManager={() => setManagerOpen(true)} />
 
         <main className="main-area" ref={containerRef}>
           {activeConns.length === 0 ? (

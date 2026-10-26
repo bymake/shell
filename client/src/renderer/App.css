@@ -1,4 +1,4 @@
-/* ShellPro 应用样式（深色运维终端风格） */
+/* ShellPro app styles (dark ops terminal theme) */
 
 * {
   box-sizing: border-box;
@@ -24,7 +24,7 @@ body {
   height: 100%;
 }
 
-/* ---------- 自定义标题栏 ---------- */
+/* ---------- Custom title bar ---------- */
 .titlebar {
   height: 36px;
   flex: 0 0 36px;
@@ -104,7 +104,7 @@ body {
   min-height: 0;
 }
 
-/* ---------- 侧栏 ---------- */
+/* ---------- Sidebar ---------- */
 .sidebar {
   width: 260px;
   min-width: 260px;
@@ -191,67 +191,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ---------- 会话列表 ---------- */
-.session-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.session-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.session-item:hover {
-  background: #21262d;
-}
-
-.session-item.active {
-  background: #1f6feb22;
-}
-
-.session-name {
-  font-size: 13px;
-  color: #f0f6fc;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-host {
-  font-size: 11px;
-  color: #8b949e;
-}
-
-.session-del {
-  background: transparent;
-  border: none;
-  color: #8b949e;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 5px;
-  border-radius: 4px;
-}
-
-.session-del:hover {
-  background: #da363333;
-  color: #ff7b72;
-}
-
-
-.active-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* ---------- 主区 ---------- */
+/* ---------- Main area ---------- */
 .main-area {
   flex: 1;
   display: flex;
@@ -301,7 +241,7 @@ body {
   color: #e6edf3;
 }
 
-/* ---------- 终端 ---------- */
+/* ---------- Terminal ---------- */
 .terminal-wrap {
   flex: 1;
   position: relative;
@@ -315,7 +255,7 @@ body {
 }
 
 
-/* ---------- 错误提示 ---------- */
+/* ---------- Error toast ---------- */
 .error-toast {
   position: fixed;
   bottom: 16px;
@@ -341,7 +281,7 @@ body {
   font-size: 15px;
 }
 
-/* ---------- 侧栏标题（含按钮） ---------- */
+/* ---------- Sidebar title (with buttons) ---------- */
 .sidebar-title { display: flex; align-items: center; justify-content: space-between; }
 .sidebar-title .btn.small { padding: 3px 8px; font-size: 11px; }
 .btn.small { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 5px; cursor: pointer; }
@@ -349,14 +289,14 @@ body {
 .btn.tiny { background: transparent; color: #58a6ff; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; }
 .btn.tiny:hover { text-decoration: underline; }
 
-/* ---------- 监控「进程」块可点击 ---------- */
+/* ---------- Monitor "process" block is clickable ---------- */
 .proc-block { cursor: pointer; display: flex; justify-content: space-between; }
 .proc-block:hover { color: #e6edf3; }
 .proc-more { color: #58a6ff; font-size: 10px; }
 .m-proc-row { cursor: pointer; }
 .m-proc-row:hover { background: #21262d; border-radius: 4px; }
 
-/* ---------- 主区分栏 ---------- */
+/* ---------- Main area split ---------- */
 .split-vert { display: flex; flex-direction: column; height: 100%; width: 100%; }
 .split-top { display: flex; flex-direction: column; min-height: 0; }
 .split-top .terminal-wrap { flex: 1; min-height: 0; }
@@ -364,7 +304,7 @@ body {
 .split-divider { height: 5px; cursor: ns-resize; background: #161b22; border-top: 1px solid #30363d; border-bottom: 1px solid #30363d; flex: none; }
 .split-divider:hover { background: #1f6feb66; }
 
-/* ---------- 通用模态 ---------- */
+/* ---------- Generic modals ---------- */
 .modal-mask { position: fixed; inset: 0; background: rgba(1, 4, 9, 0.7); z-index: 200; display: flex; align-items: center; justify-content: center; }
 .modal { background: #0d1117; border: 1px solid #30363d; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); min-width: 420px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #21262d; }
@@ -372,7 +312,7 @@ body {
 .modal-x { background: transparent; border: none; color: #8b949e; font-size: 16px; cursor: pointer; }
 .modal-x:hover { color: #f0f6fc; }
 
-/* ---------- 连接管理器 ---------- */
+/* ---------- Connection manager ---------- */
 .modal.cm { width: 920px; max-width: 96vw; height: 600px; max-height: 88vh; display: flex; flex-direction: column; }
 .cm-body { display: flex; flex: 1; min-height: 0; }
 .cm-left { width: 52%; border-right: 1px solid #21262d; display: flex; flex-direction: column; min-height: 0; }
@@ -415,7 +355,7 @@ body {
 .btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
 .btn.primary:hover { background: #388bfd; }
 
-/* ---------- 进程 Top 弹窗 ---------- */
+/* ---------- Process top modal ---------- */
 .modal.top-modal { width: 760px; max-width: 94vw; height: 540px; max-height: 86vh; display: flex; flex-direction: column; }
 .top-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 14px; border-bottom: 1px solid #21262d; color: #8b949e; font-size: 12px; }
 .top-filter { background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 4px 8px; font-size: 12px; width: 200px; }
@@ -433,7 +373,7 @@ body {
 .top-row.net-row .tx { color: #d29922; }
 .top-empty { padding: 20px; color: #6e7681; text-align: center; font-size: 12px; }
 
-/* ---------- SFTP 面板 ---------- */
+/* ---------- SFTP panel ---------- */
 .sftp-panel { display: flex; height: 100%; min-height: 0; background: #0d1117; }
 .sftp-tree { width: 190px; min-width: 140px; flex-shrink: 0; overflow: auto; border-right: 1px solid #21262d; padding: 4px 0; font-size: 12px; }
 .tree-row { display: flex; align-items: center; gap: 2px; padding: 4px 6px; cursor: pointer; color: #c9d1d9; white-space: nowrap; border-left: 2px solid transparent; }
@@ -457,7 +397,7 @@ body {
 .sftp-err { padding: 6px 12px; color: #ff7b72; font-size: 12px; }
 .sftp-msg { padding: 6px 12px; color: #3fb950; font-size: 12px; }
 
-/* ---------- 右键菜单 ---------- */
+/* ---------- Context menu ---------- */
 .ctx-mask { position: fixed; inset: 0; z-index: 300; }
 .ctx-menu { position: fixed; z-index: 1000; background: #161b22; border: 1px solid #30363d; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); padding: 4px; min-width: 110px; pointer-events: auto; }
 .ctx-item { display: block; width: 100%; text-align: left; background: transparent; border: none; color: #e6edf3; padding: 7px 12px; font-size: 12px; cursor: pointer; border-radius: 5px; user-select: none; }
@@ -465,21 +405,20 @@ body {
 .ctx-item.ctx-dis { color: #484f58; cursor: default; }
 .ctx-item.ctx-dis:hover { background: transparent; color: #484f58; }
 
-/* ---------- 在线编辑器 ---------- */
+/* ---------- Online editor ---------- */
 .modal.editor-modal { width: 720px; max-width: 92vw; height: 560px; max-height: 86vh; display: flex; flex-direction: column; }
 .editor-loading { flex: 1; display: flex; align-items: center; justify-content: center; color: #8b949e; font-size: 13px; }
 .editor-area { flex: 1; min-height: 0; margin: 10px; background: #010409; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; font-family: Consolas, "Cascadia Code", monospace; font-size: 13px; padding: 10px; resize: none; outline: none; }
 .editor-area:focus { border-color: #1f6feb; }
 
-/* ---------- 侧栏空闲态 ---------- */
+/* ---------- Sidebar idle state ---------- */
 .sidebar-idle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; }
 .sidebar-idle-title { font-size: 18px; font-weight: 700; color: #f0f6fc; }
 .sidebar-idle p { color: #8b949e; font-size: 12px; margin: 0; }
-.sidebar-idle-hint { color: #6e7681 !important; font-size: 11px !important; }
 .monitor { border-top: 1px solid #21262d; margin-top: 8px; padding-top: 8px; }
 .mon-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .mon-head h3 { font-size: 12px; color: #f0f6fc; font-weight: 600; }
-.sync-state, .sync-on { font-size: 10px; color: #3fb950; }
+.sync-on { font-size: 10px; color: #3fb950; }
 .sync-off { font-size: 10px; color: #f85149; }
 .sync-pend { font-size: 10px; color: #8b949e; }
 .mon-err { font-size: 11px; color: #ff7b72; background: #da363322; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; }
@@ -506,21 +445,21 @@ body {
 .m-disk-row { padding: 2px 0; color: #8b949e; }
 .m-disk-row .sz { color: #e6edf3; }
 
-/* 同步状态 IP + 复制 */
+/* Sync status IP + copy */
 .sync-ip { display: flex; align-items: center; gap: 6px; font-size: 11px; margin-bottom: 8px; }
 .sync-ip-label { color: #6e7681; }
 .sync-ip-val { color: #e6edf3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-/* 系统信息 */
+/* System info */
 .sys-line { display: flex; justify-content: space-between; font-size: 11px; color: #6e7681; padding: 2px 0; }
 .sys-line .sys-val { color: #e6edf3; }
-/* 网络 */
+/* Network */
 .net-list { display: flex; flex-direction: column; gap: 2px; }
 .net-row { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; }
 .net-if { color: #58a6ff; }
 .net-io { color: #e6edf3; }
 .net-empty { color: #6e7681; font-size: 11px; }
 
-/* 连接管理器单页表单（v3：无标签页、协议单选） */
+/* Connection manager single-page form (no tabs, protocol dropdown) */
 .cm-right { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .cm-single { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
 .cm-frow { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #8b949e; }
@@ -533,7 +472,7 @@ body {
 .cm-del { color: #ff7b72; }
 .cm-del:hover { color: #ff5252; text-decoration: underline; }
 
-/* 标签页含关闭 X */
+/* Tabs with close X */
 .tab { display: flex; align-items: center; gap: 6px; background: transparent; border: none; color: #8b949e; padding: 0 10px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; }
 .tab.active { color: #f0f6fc; border-bottom-color: #58a6ff; }
 .tab:hover { color: #e6edf3; }
@@ -541,13 +480,13 @@ body {
 .tab-x { background: transparent; border: none; color: #6e7681; font-size: 13px; cursor: pointer; padding: 2px; border-radius: 4px; }
 .tab-x:hover { color: #fff; background: #30363d; }
 
-/* 协议下拉 */
+/* Protocol dropdown */
 .cm-proto-sel { background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 7px 9px; font-size: 13px; }
 .cm-proto-sel:focus { border-color: #1f6feb; outline: none; }
-/* 标签栏加号 */
+/* Tab strip add button */
 .tab-add { background: transparent; border: none; color: #8b949e; font-size: 16px; width: 32px; cursor: pointer; border-radius: 4px; align-self: center; margin-left: 2px; }
 .tab-add:hover { background: #21262d; color: #f0f6fc; }
-/* 密码恒 8 星号遮罩 */
+/* Password mask: always 8 asterisks */
 .pw-box { position: relative; flex: 1; }
 .pw-box input.pw-real { width: 100%; background: #161b22; border: 1px solid #30363d; color: transparent; caret-color: transparent; padding: 7px 9px; font-size: 13px; border-radius: 6px; }
 .pw-box input.pw-real:focus { border-color: #1f6feb; outline: none; }
@@ -555,6 +494,6 @@ body {
 .pw-mask.empty { color: #6e7681; }
 .pw-caret { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); width: 2px; height: 15px; background: #58a6ff; pointer-events: none; animation: pw-blink 1s step-end infinite; }
 @keyframes pw-blink { 50% { opacity: 0; } }
-/* 进程网格：整块可点击弹 top */
+/* Process grid: whole block clickable to open top */
 .m-proc-grid { cursor: pointer; border: 1px solid transparent; border-radius: 6px; margin-bottom: 8px; }
 .m-proc-grid:hover { border-color: #21262d; background: rgba(22,27,34,0.5); }

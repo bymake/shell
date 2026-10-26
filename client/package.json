@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "ShellPro - 国产跨平台 SSH/SFTP 远程服务器管理终端",
+  "description": "ShellPro - 开源的 SSH/SFTP 远程服务器管理终端（Electron 桌面客户端 + Go 云同步后端）",
   "main": "dist-electron/index.js",
   "author": "ShellPro",
   "scripts": {
@@ -35,7 +35,6 @@
     "typescript": "~6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-electron": "^1.1.2",
-    "vite-plugin-electron-renderer": "^1.0.0",
     "zustand": "^5.0.16"
   }
 }

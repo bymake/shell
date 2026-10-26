@@ -1,8 +1,8 @@
 /**
- * SFTP 文件传输引擎（ssh2 sftp 流）
- * - 基于 conn 的控制连接打开 SFTP 子系统
- * - 目录浏览 / 上传 / 下载（流式）
- * - 路径校验，防路径穿越
+ * SFTP file transfer engine (ssh2 sftp stream)
+ * - Opens the SFTP subsystem over the control connection
+ * - Directory listing / upload / download (streaming)
+ * - Path validation to prevent traversal
  */
 import { getConnection } from '../ssh/index'
 import { createLogger } from '../logger/index'
@@ -31,10 +31,10 @@ export interface SftpListResult {
 
 type SftpSession = import('ssh2').SFTPWrapper
 
-/** 每个连接只建一个 SFTP 通道并复用，避免反复新建导致服务器通道数超限 */
+/** One SFTP channel per connection, reused; avoids exhausting server channels */
 const sftpSessions = new Map<string, SftpSession>()
 
-/** 打开（或复用）SFTP 会话；通道随连接关闭而清理 */
+/** Open (or reuse) an SFTP session; the channel is cleaned up when the connection closes */
 export async function openSftp(connId: string): Promise<SftpSession> {
   const cached = sftpSessions.get(connId)
   if (cached) return cached
@@ -51,20 +51,20 @@ export async function openSftp(connId: string): Promise<SftpSession> {
   })
 }
 
-/** 关闭连接的 SFTP 通道（连接断开时调用） */
+/** Close the SFTP channel for a connection (called on disconnect) */
 export function closeSftp(connId: string): void {
   const s = sftpSessions.get(connId)
   if (s) {
     try {
       s.end()
     } catch {
-      /* 忽略 */
+      // ignore
     }
   }
   sftpSessions.delete(connId)
 }
 
-/** 目录浏览 */
+/** List a remote directory */
 export async function listDir(connId: string, path: string): Promise<SftpListResult> {
   const sftp = await openSftp(connId)
   return new Promise((resolve, reject) => {
@@ -90,7 +90,7 @@ export async function listDir(connId: string, path: string): Promise<SftpListRes
   })
 }
 
-/** SFTP 路径基本校验（允许 .. 用于目录导航；本地落盘路径在调用方校验） */
+/** Basic SFTP path check (allows ".." for directory navigation; local paths are checked by the caller) */
 function safeRemote(remotePath: string): string {
   if (!remotePath || remotePath.trim() === '') {
     throw new Error('非法路径：路径不能为空')
@@ -98,7 +98,7 @@ function safeRemote(remotePath: string): string {
   return remotePath
 }
 
-/** 上传单个文件 */
+/** Upload a single file */
 export async function uploadFile(connId: string, localPath: string, remotePath: string): Promise<void> {
   const sftp = await openSftp(connId)
   const dest = safeRemote(remotePath)
@@ -114,7 +114,7 @@ export async function uploadFile(connId: string, localPath: string, remotePath: 
   })
 }
 
-/** 下载单个文件 */
+/** Download a single file */
 export async function downloadFile(connId: string, remotePath: string, localPath: string): Promise<void> {
   const sftp = await openSftp(connId)
   const src = safeRemote(remotePath)
@@ -130,7 +130,7 @@ export async function downloadFile(connId: string, remotePath: string, localPath
   })
 }
 
-/** 读取远程文本文件（在线编辑用，≤ 1MB） */
+/** Read a remote text file (for online editing; up to 1MB) */
 export async function readTextFile(connId: string, remotePath: string): Promise<string> {
   const sftp = await openSftp(connId)
   const src = safeRemote(remotePath)
@@ -142,7 +142,7 @@ export async function readTextFile(connId: string, remotePath: string): Promise<
   })
 }
 
-/** 写入远程文本文件（在线编辑保存） */
+/** Write a remote text file (save from online editing) */
 export async function writeTextFile(connId: string, remotePath: string, content: string): Promise<void> {
   const sftp = await openSftp(connId)
   const dest = safeRemote(remotePath)

@@ -1,13 +1,15 @@
 /**
- * SFTP 文件面板（主区下方）
- * - 左侧窄目录树（仿 Linux 文件管理器，懒加载、随 sftpPath 联动展开）
- * - 右侧文件列表：目录在前、文件在后，各自按名称排序
- * - 文本文件右键「编辑」→ 在线编辑并写回远程
- * - 工具栏：刷新 / 上级路径 / 上传 / 下载
+ * SFTP file panel (bottom of the main area)
+ * - Left: narrow directory tree (like a file manager; lazy-loaded, expands along sftpPath)
+ * - Right: file list (directories first, then files, each sorted by name)
+ * - Right-click "Edit" on text files -> online edit and write back to the remote
+ * - Toolbar: refresh / parent path / upload / download
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShell } from '../state/sessionStore'
 import { zhError } from '../lib/errors'
+import { fmtSize } from '../lib/format'
+import { parentPath, join } from '../lib/path'
 import { EditorModal } from './EditorModal'
 
 interface Entry {
@@ -20,7 +22,7 @@ interface Props {
   connId: string
 }
 
-// 目录树节点：children === undefined 表示尚未加载
+// Tree node: children === undefined means not yet loaded
 interface TreeNode {
   name: string
   path: string
@@ -28,7 +30,7 @@ interface TreeNode {
   children?: TreeNode[]
 }
 
-// 视为文本的扩展名（可右键在线编辑）
+// Extensions treated as text (right-click for online editing)
 const TEXT_EXT = new Set([
   'txt', 'log', 'conf', 'cfg', 'ini', 'sh', 'bash', 'zsh', 'py', 'js', 'ts', 'json',
   'yml', 'yaml', 'md', 'html', 'htm', 'css', 'xml', 'properties', 'env', 'toml',
@@ -40,25 +42,6 @@ function isTextFile(name: string): boolean {
   if (TEXT_EXT.has(n)) return true
   const ext = n.includes('.') ? n.split('.').pop() : ''
   return !!ext && TEXT_EXT.has(ext)
-}
-
-function fmtSize(n: number): string {
-  if (n >= 1073741824) return (n / 1073741824).toFixed(1) + 'G'
-  if (n >= 1048576) return (n / 1048576).toFixed(1) + 'M'
-  if (n >= 1024) return (n / 1024).toFixed(1) + 'K'
-  return n + 'B'
-}
-
-function parentPath(p: string): string {
-  if (p === '/' || p === '.') return p
-  const parts = p.split('/').filter(Boolean)
-  parts.pop()
-  return parts.length ? '/' + parts.join('/') : '/'
-}
-
-function join(p: string, name: string): string {
-  if (p === '/' || p === '.') return '/' + name
-  return p.replace(/\/+$/, '') + '/' + name
 }
 
 export function SftpPanel({ connId }: Props) {
@@ -94,8 +77,8 @@ export function SftpPanel({ connId }: Props) {
     void load(sftpPath)
   }, [sftpPath, load])
 
-  // ---------- 目录树 ----------
-  // 只对未加载节点执行远程 list；children 已存在则直接复用
+  // ---------- Directory tree ----------
+  // Only list remote dirs for nodes that are not loaded yet; reuse children when present
   const loadNode = useCallback(
     async (node: TreeNode) => {
       if (node.children !== undefined) return
@@ -112,7 +95,7 @@ export function SftpPanel({ connId }: Props) {
     [connId],
   )
 
-  // 沿 sftpPath 逐级确保节点存在并展开（与 SSH cd / 树点击联动）
+  // Ensure nodes exist and expand along sftpPath (syncs with SSH cd / tree clicks)
   const ensurePath = useCallback(
     async (targetPath: string) => {
       if (!treeRef.current) {
@@ -146,12 +129,12 @@ export function SftpPanel({ connId }: Props) {
     lastToggle.current = now
     node.expanded = !node.expanded
     if (node.expanded) await loadNode(node)
-    // 必须传新引用，否则 React 状态比较跳过重渲染
+    // Must pass a new reference, otherwise React's state comparison skips re-render
     if (treeRef.current) setTree({ ...treeRef.current })
   }
 
   const goNode = async (node: TreeNode) => {
-    // 未展开的目录：先展开再进入（进入时 ensurePath 会沿路径联动）
+    // Unexpanded directory: expand first, then enter (ensurePath syncs along the path)
     if (!node.expanded) {
       node.expanded = true
       await loadNode(node)
@@ -181,7 +164,8 @@ export function SftpPanel({ connId }: Props) {
               void toggleNode(node)
             }}
             onClick={(e) => {
-              // 阻断 click 冒泡：否则闭合后 click 会落到行上触发 goNode 重新展开
+              // Block click bubbling: otherwise a click after collapsing lands on the row
+              // and triggers goNode, which re-expands the node
               e.stopPropagation()
             }}
           >
@@ -195,7 +179,7 @@ export function SftpPanel({ connId }: Props) {
     )
   }
 
-  // ---------- 右侧文件列表 ----------
+  // ---------- Right: file list ----------
   const rows = useMemo(() => {
     const dirs = entries.filter((e) => e.attrs.isDirectory).sort((a, b) => a.filename.localeCompare(b.filename, 'zh'))
     const files = entries.filter((e) => !e.attrs.isDirectory).sort((a, b) => a.filename.localeCompare(b.filename, 'zh'))

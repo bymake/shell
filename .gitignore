@@ -1,3 +1,11 @@
+# ===== 用户指定忽略（2026-10-26）=====
+cloud/
+doc/
+tmp/
+client/node_modules/
+client/release/
+client/dist-electron/
+
 # 依赖
 node_modules/
 dist/

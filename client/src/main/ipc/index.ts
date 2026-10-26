@@ -1,8 +1,8 @@
 /**
- * IPC 白名单通道注册（安全边界）
- * - 渲染进程只能调用这里显式注册的通道
- * - 所有 SSH/存储/监控/SFTP 操作在主进程完成
- * - 终端数据经 terminal:data:{connId} 事件回推渲染层
+ * IPC whitelist channel registration (security boundary)
+ * - The renderer can only invoke channels explicitly registered here
+ * - All SSH/storage/monitor/SFTP operations run in the main process
+ * - Terminal data is pushed back to the renderer via terminal:data:{connId} events
  */
 import { ipcMain, dialog, clipboard, BrowserWindow, type WebContents } from 'electron'
 import { execFile } from 'node:child_process'
@@ -10,7 +10,7 @@ import type { ClientChannel } from 'ssh2'
 import { createConnection, closeConnection, openShell, type ConnId } from '../ssh/index'
 import { listDir, uploadFile, downloadFile, readTextFile, writeTextFile, closeSftp } from '../sftp/index'
 import { collectSnapshot } from '../monitor/index'
-import { insertSession, listSessions, deleteSession, getSession, updateSession, type NewSession } from '../storage/index'
+import { insertSession, listSessions, deleteSession, updateSession, type NewSession } from '../storage/index'
 import { createLogger } from '../logger/index'
 
 const log = createLogger('ipc')
@@ -18,6 +18,15 @@ const log = createLogger('ipc')
 function err(e: unknown): never {
   const msg = e instanceof Error ? e.message : String(e)
   throw new Error(JSON.stringify({ code: 'ERR', message: msg }))
+}
+
+/** Wrap a handler body: any throw becomes the ERR envelope */
+function handle<T>(fn: () => T | Promise<T>): Promise<T> {
+  try {
+    return Promise.resolve(fn())
+  } catch (e) {
+    return err(e)
+  }
 }
 
 interface TerminalEntry {
@@ -32,101 +41,70 @@ function send(wc: WebContents, channel: string, payload: unknown): void {
 }
 
 export function registerIpc(getWebContents: () => WebContents): void {
-  // ---------- 连接与会话 ----------
-  ipcMain.handle('conn:create', async (_e, opts) => {
-    try {
+  // ---------- Connections & sessions ----------
+  ipcMain.handle('conn:create', (_e, opts) =>
+    handle(async () => {
       const protocol = (opts?.protocol as string | undefined) ?? 'ssh'
       if (protocol === 'serial') {
         return err(new Error('串口连接需本机原生串口驱动，当前绿色版暂不支持'))
       }
       const conn = await createConnection(opts)
       return { connId: conn.id }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  ipcMain.handle('conn:close', (_e, connId: ConnId) => {
-    try {
+  ipcMain.handle('conn:close', (_e, connId: ConnId) =>
+    handle(() => {
       const t = terminals.get(connId)
       if (t?.sshStream) t.sshStream.destroy()
       terminals.delete(connId)
       closeSftp(connId)
       closeConnection(connId)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-
-  // ---------- 会话存储 ----------
-  ipcMain.handle('session:create', (_e, s: NewSession) => {
-    try {
-      return { id: insertSession(s) }
-    } catch (e) {
-      return err(e)
-    }
-  })
-  ipcMain.handle('session:list', (_e, opts?: { search?: string }) => {
-    try {
-      return { sessions: listSessions(opts ?? {}) }
-    } catch (e) {
-      return err(e)
-    }
-  })
-  ipcMain.handle('session:get', (_e, id: number) => {
-    try {
-      const s = getSession(id)
-      if (!s) return err(new Error('会话不存在'))
-      return { session: s }
-    } catch (e) {
-      return err(e)
-    }
-  })
-  ipcMain.handle('session:update', (_e, id: number, fields: Partial<NewSession>) => {
-    try {
+  // ---------- Session storage ----------
+  ipcMain.handle('session:create', (_e, s: NewSession) => handle(() => ({ id: insertSession(s) })))
+  ipcMain.handle('session:list', (_e, opts?: { search?: string }) =>
+    handle(() => ({ sessions: listSessions(opts ?? {}) })),
+  )
+  ipcMain.handle('session:update', (_e, id: number, fields: Partial<NewSession>) =>
+    handle(() => {
       updateSession(id, fields)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
-  ipcMain.handle('session:delete', (_e, id: number) => {
-    try {
+    }),
+  )
+  ipcMain.handle('session:delete', (_e, id: number) =>
+    handle(() => {
       deleteSession(id)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  // ---------- 文件选择对话框 ----------
-  ipcMain.handle('dialog:openFile', async () => {
-    try {
+  // ---------- File dialogs ----------
+  ipcMain.handle('dialog:openFile', () =>
+    handle(async () => {
       const r = await dialog.showOpenDialog({ title: '选择要上传的文件', properties: ['openFile'] })
       if (r.canceled || r.filePaths.length === 0) return { path: null }
       return { path: r.filePaths[0] }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  ipcMain.handle('dialog:saveFile', async (_e, defaultName?: string) => {
-    try {
+  ipcMain.handle('dialog:saveFile', (_e, defaultName?: string) =>
+    handle(async () => {
       const r = await dialog.showSaveDialog({
         title: '保存到本地',
         defaultPath: defaultName ? `C:\\Users\\${process.env.USERNAME}\\Downloads\\${defaultName}` : undefined,
       })
       if (r.canceled || !r.filePath) return { path: null }
       return { path: r.filePath }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  // ---------- 监控（T4） ----------
-  // 防重入：同一连接上一轮采集未完成时跳过，避免并发 exec 通道堆积
+  // ---------- Monitor (T4) ----------
+  // Re-entry guard: skip if the previous collect for this connection is still running,
+  // preventing exec channel pile-up
   const collecting = new Set<ConnId>()
   ipcMain.handle('monitor:collect', async (_e, connId: ConnId) => {
     if (collecting.has(connId)) return { skipped: true }
@@ -141,51 +119,32 @@ export function registerIpc(getWebContents: () => WebContents): void {
   })
 
   // ---------- SFTP ----------
-  ipcMain.handle('sftp:list', async (_e, connId: ConnId, path: string) => {
-    try {
-      return await listDir(connId, path)
-    } catch (e) {
-      return err(e)
-    }
-  })
-  ipcMain.handle('sftp:upload', async (_e, connId: ConnId, localPath: string, remotePath: string) => {
-    try {
+  ipcMain.handle('sftp:list', (_e, connId: ConnId, path: string) => handle(() => listDir(connId, path)))
+  ipcMain.handle('sftp:upload', (_e, connId: ConnId, localPath: string, remotePath: string) =>
+    handle(async () => {
       await uploadFile(connId, localPath, remotePath)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
-  ipcMain.handle('sftp:download', async (_e, connId: ConnId, remotePath: string, localPath: string) => {
-    try {
+    }),
+  )
+  ipcMain.handle('sftp:download', (_e, connId: ConnId, remotePath: string, localPath: string) =>
+    handle(async () => {
       await downloadFile(connId, remotePath, localPath)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
-
-  ipcMain.handle('sftp:readText', async (_e, connId: ConnId, remotePath: string) => {
-    try {
-      const content = await readTextFile(connId, remotePath)
-      return { content }
-    } catch (e) {
-      return err(e)
-    }
-  })
-
-  ipcMain.handle('sftp:writeText', async (_e, connId: ConnId, remotePath: string, content: string) => {
-    try {
+    }),
+  )
+  ipcMain.handle('sftp:readText', (_e, connId: ConnId, remotePath: string) =>
+    handle(async () => ({ content: await readTextFile(connId, remotePath) })),
+  )
+  ipcMain.handle('sftp:writeText', (_e, connId: ConnId, remotePath: string, content: string) =>
+    handle(async () => {
       await writeTextFile(connId, remotePath, content)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  // ---------- 剪贴板 ----------
-  // readText 在个别环境会内部抛"对象无法克隆"，改用多通道读取兜底：
-  // readBuffer(text/plain) → readText() → read('text/plain')，任一失败自动回落
+  // ---------- Clipboard ----------
+  // readText can throw "object could not be cloned" in some environments; fall back
+  // through readBuffer(text/plain) -> readText() -> read('text/plain'), each failing on to the next
   ipcMain.handle('clipboard:readText', () => {
     const c = clipboard as unknown as {
       readBuffer?: (fmt: string) => Buffer
@@ -197,14 +156,14 @@ export function registerIpc(getWebContents: () => WebContents): void {
       const buf = c.readBuffer?.('text/plain')
       if (buf && buf.length > 0) text = buf.toString('utf8')
     } catch {
-      /* 忽略，走下一通道 */
+      // fall through to next channel
     }
     if (!text) {
       try {
         const t = c.readText()
         if (typeof t === 'string') text = t
       } catch {
-        /* 忽略 */
+        // ignore
       }
     }
     if (!text) {
@@ -212,7 +171,7 @@ export function registerIpc(getWebContents: () => WebContents): void {
         const t = c.read?.('text/plain')
         if (typeof t === 'string') text = t
       } catch {
-        /* 忽略 */
+        // ignore
       }
     }
     return { text }
@@ -227,9 +186,9 @@ export function registerIpc(getWebContents: () => WebContents): void {
     }
   })
 
-  // ---------- 终端（远程 SSH shell） ----------
-  ipcMain.handle('terminal:open', async (_e, connId: ConnId) => {
-    try {
+  // ---------- Terminal (remote SSH shell) ----------
+  ipcMain.handle('terminal:open', (_e, connId: ConnId) =>
+    handle(async () => {
       const wc = getWebContents()
       const stream = await openShell(connId)
 
@@ -237,45 +196,37 @@ export function registerIpc(getWebContents: () => WebContents): void {
       stream.on('data', (data: Buffer) => send(wc, `terminal:data:${connId}`, data.toString('utf-8')))
       stream.on('close', () => send(wc, `terminal:exit:${connId}`, { code: 0 }))
       return { connId }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  ipcMain.handle('terminal:input', (_e, connId: ConnId, data: string) => {
-    try {
+  ipcMain.handle('terminal:input', (_e, connId: ConnId, data: string) =>
+    handle(() => {
       const t = terminals.get(connId)
       if (!t) return err(new Error('终端未打开'))
       t.sshStream?.write(data)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  ipcMain.handle('terminal:resize', (_e, connId: ConnId, cols: number, rows: number) => {
-    try {
+  ipcMain.handle('terminal:resize', (_e, connId: ConnId, cols: number, rows: number) =>
+    handle(() => {
       const t = terminals.get(connId)
       if (!t) return err(new Error('终端未打开'))
       t.sshStream?.setWindow?.(rows, cols, cols, rows)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  ipcMain.handle('terminal:close', (_e, connId: ConnId) => {
-    try {
+  ipcMain.handle('terminal:close', (_e, connId: ConnId) =>
+    handle(() => {
       const t = terminals.get(connId)
       if (t?.sshStream) t.sshStream.destroy()
       terminals.delete(connId)
       return { ok: true }
-    } catch (e) {
-      return err(e)
-    }
-  })
+    }),
+  )
 
-  // ---------- 窗口控制（自定义标题栏） ----------
+  // ---------- Window controls (custom title bar) ----------
   ipcMain.handle('win:minimize', () => BrowserWindow.fromWebContents(getWebContents())?.minimize())
   ipcMain.handle('win:maximize', () => {
     const w = BrowserWindow.fromWebContents(getWebContents())

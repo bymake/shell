@@ -1,19 +1,12 @@
 /**
- * 预加载脚本（contextBridge）
- * - 只暴露白名单 API 到 window.shellpro
- * - 渲染进程无法直接触达 Node / ssh / DB
+ * Preload script (contextBridge)
+ * - Exposes only whitelisted APIs to window.shellpro
+ * - The renderer cannot reach Node / ssh / DB directly
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
 
 const api = {
-  menu: {
-    onNewConnect: (cb: () => void): (() => void) => {
-      const listener = () => cb()
-      ipcRenderer.on('menu:new-connect', listener)
-      return () => ipcRenderer.removeListener('menu:new-connect', listener)
-    },
-  },
   conn: {
     create: (opts: Record<string, unknown>) => ipcRenderer.invoke('conn:create', opts),
     close: (connId: string) => ipcRenderer.invoke('conn:close', connId),
@@ -21,7 +14,6 @@ const api = {
   session: {
     create: (s: Record<string, unknown>) => ipcRenderer.invoke('session:create', s),
     list: (opts?: Record<string, unknown>) => ipcRenderer.invoke('session:list', opts),
-    get: (id: number) => ipcRenderer.invoke('session:get', id),
     update: (id: number, fields: Record<string, unknown>) => ipcRenderer.invoke('session:update', id, fields),
     delete: (id: number) => ipcRenderer.invoke('session:delete', id),
   },

@@ -1,6 +1,0 @@
-﻿
-> shellpro@0.1.0 build
-> tsc -b && vite build
-
-src/main/ipc/index.ts(185,29): error TS2339: Property 'readBuffer' does not exist on type 'Clipboard'.
-src/main/ipc/index.ts(200,34): error TS2554: Expected 0 arguments, but got 1.

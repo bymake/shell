@@ -1,13 +1,13 @@
 /**
- * 统一日志模块（ShellPro）
- * - 统一 logger，控制台输出，带时间戳与级别
- * - 敏感信息脱敏：不明文记录口令、私钥、token
+ * Unified logging module (ShellPro)
+ * - Single logger, console output with timestamp and level
+ * - Sensitive data redaction: passwords, private keys, and tokens are never logged in plaintext
  */
 import { inspect } from 'node:util'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
-// 需要脱敏的关键字（大小写不敏感匹配）
+// Keywords requiring redaction (case-insensitive match)
 const SENSITIVE_KEYS = [
   'password',
   'passwd',
@@ -64,5 +64,3 @@ export function createLogger(scope: string) {
     error: (...args: unknown[]) => write('error', scope, args),
   }
 }
-
-export const logger = createLogger('shellpro')

@@ -1,7 +1,7 @@
 /**
- * SSH 连接引擎（ssh2）
- * - 密码 / 密钥（RSA/ECDSA/Ed25519）登录
- * - 交互 shell（供终端绑定）与 exec（命令执行，监控采集用）
+ * SSH connection engine (ssh2)
+ * - Password / private key (RSA/ECDSA/Ed25519) authentication
+ * - Interactive shell (for the terminal) and exec (for monitor collection)
  */
 import { Client, type ClientChannel } from 'ssh2'
 import { randomUUID } from 'node:crypto'
@@ -48,7 +48,7 @@ function connectOne(opts: ConnOptions): Promise<Client> {
   })
 }
 
-/** 建立 SSH 连接 */
+/** Establish an SSH connection */
 export async function createConnection(opts: ConnOptions): Promise<ConnHandle> {
   const client = await connectOne(opts)
   const id = randomUUID()
@@ -72,7 +72,7 @@ export function closeConnection(id: ConnId): void {
   }
 }
 
-/** 打开交互 shell（供 xterm 绑定），返回读写流 */
+/** Open an interactive shell (for xterm binding); returns a read/write stream */
 export function openShell(id: ConnId): Promise<ClientChannel> {
   const h = getConnection(id)
   return new Promise((resolve, reject) => {
@@ -83,7 +83,7 @@ export function openShell(id: ConnId): Promise<ClientChannel> {
   })
 }
 
-/** 执行单条命令，返回 stdout/stderr（监控采集、路径探测用） */
+/** Run a single command; returns stdout/stderr (monitor collection, path probing) */
 export function execCommand(id: ConnId, command: string): Promise<{ code: number; stdout: string; stderr: string }> {
   const h = getConnection(id)
   return new Promise((resolve, reject) => {

@@ -1,5 +1,0 @@
-﻿main file: index.js size=1219
-no pagent -> ssh2 externalized (good)
-index.js size now: 1219
-node:sqlite ref: False
-electron ref: True

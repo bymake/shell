@@ -1,15 +1,16 @@
 /**
- * 监控面板（M-04 / T4-1）
- * - 基于主进程 monitor:collect 返回的结构化快照渲染
- * - CPU/内存/交换 使用率 + 进度条；进程列表；磁盘挂载
- * - 接入 echarts 实时曲线（CPU/内存趋势）
+ * Monitor panel (M-04 / T4-1)
+ * - Renders the structured snapshot returned by monitor:collect
+ * - CPU/memory/swap usage + progress bars; process list; disk mounts
+ * - echarts real-time curves (CPU/memory trends)
  */
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { TopModal } from './TopModal'
 import { NetModal } from './NetModal'
 import { useShell } from '../state/sessionStore'
-import { zhError } from '../lib/errors'
+import { fmtSize } from '../lib/format'
+import { useMonitorPoll } from '../lib/useMonitorPoll'
 
 interface Snapshot {
   ts: number
@@ -21,59 +22,15 @@ interface Snapshot {
   uptime: string
 }
 
-const fmt = (b: number): string => {
-  if (b >= 1073741824) return (b / 1073741824).toFixed(1) + 'G'
-  if (b >= 1048576) return (b / 1048576).toFixed(1) + 'M'
-  if (b >= 1024) return (b / 1024).toFixed(0) + 'K'
-  return b + 'B'
-}
-
+const fmt = fmtSize
 export function MonitorPanel({ connId }: { connId: string }) {
   const activeConns = useShell((s) => s.activeConns)
   const host = activeConns.find((c) => c.connId === connId)?.host ?? ''
   const [snap, setSnap] = useState<Snapshot | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [topOpen, setTopOpen] = useState(false)
   const [netOpen, setNetOpen] = useState(false)
   const chartRef = useRef<HTMLDivElement>(null)
   const history = useRef<{ t: number; cpu: number; mem: number }[]>([])
-
-  useEffect(() => {
-    let stop = false
-    let busy = false
-    let timer: ReturnType<typeof setInterval> | null = null
-    const tick = async () => {
-      if (stop || busy) return
-      busy = true
-      try {
-        const s = (await window.shellpro.monitor.collect(connId)) as Snapshot & { skipped?: boolean }
-        if (stop || s?.skipped) return
-        setSnap(s)
-        setError(null)
-        history.current.push({ t: s.ts, cpu: s.cpu.usage, mem: s.mem.usage })
-        if (history.current.length > 60) history.current.shift()
-        drawChart()
-      } catch (e) {
-        if (stop) return
-        if (/not connected/i.test(String(e))) {
-          setError('已断开')
-          stop = true
-          if (timer) clearInterval(timer)
-        } else {
-          setError(`采集失败：${zhError(e)}`)
-        }
-      } finally {
-        busy = false
-      }
-    }
-    tick()
-    timer = setInterval(tick, 2000)
-    return () => {
-      stop = true
-      if (timer) clearInterval(timer)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connId])
 
   function drawChart() {
     const el = chartRef.current
@@ -120,6 +77,13 @@ export function MonitorPanel({ connId }: { connId: string }) {
       ],
     })
   }
+
+  const { error } = useMonitorPoll<Snapshot>(connId, (s) => {
+    setSnap(s)
+    history.current.push({ t: s.ts, cpu: s.cpu.usage, mem: s.mem.usage })
+    if (history.current.length > 60) history.current.shift()
+    drawChart()
+  })
 
   return (
     <div className="monitor">

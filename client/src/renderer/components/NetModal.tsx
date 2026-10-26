@@ -1,10 +1,11 @@
 /**
- * 网络接口弹窗
- * - 点击监控面板「网络」块弹出，展示全部网络接口
- * - 每 2 秒采集一次，可按 接口名/接收/发送 排序，可过滤接口名
+ * Network interface modal
+ * - Opened by clicking the "Network" block of the monitor panel; shows all interfaces
+ * - Collects every 2 seconds; sortable by interface/received/sent and filterable
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { zhError } from '../lib/errors'
+import { useMemo, useState } from 'react'
+import { fmtSize } from '../lib/format'
+import { useMonitorPoll } from '../lib/useMonitorPoll'
 
 interface NetIf {
   iface: string
@@ -19,50 +20,15 @@ interface Props {
   onClose: () => void
 }
 
-const fmt = (b: number): string => {
-  if (b >= 1073741824) return (b / 1073741824).toFixed(1) + 'G'
-  if (b >= 1048576) return (b / 1048576).toFixed(1) + 'M'
-  if (b >= 1024) return (b / 1024).toFixed(0) + 'K'
-  return b + 'B'
-}
+const fmt = fmtSize
 
 export function NetModal({ connId, onClose }: Props) {
   const [nets, setNets] = useState<NetIf[]>([])
-  const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('rx')
   const [asc, setAsc] = useState(false)
   const [filter, setFilter] = useState('')
-  const stopRef = useRef(false)
 
-  useEffect(() => {
-    stopRef.current = false
-    let t: ReturnType<typeof setInterval> | null = null
-    const tick = async () => {
-      if (stopRef.current) return
-      try {
-        const s = (await window.shellpro.monitor.collect(connId)) as { nets: NetIf[] }
-        if (!stopRef.current) {
-          setNets(s.nets ?? [])
-          setError(null)
-        }
-      } catch (e) {
-        if (stopRef.current) return
-        if (/not connected/i.test(String(e))) {
-          setError('已断开')
-          stopRef.current = true
-          if (t) clearInterval(t)
-        } else {
-          setError(`采集失败：${zhError(e)}`)
-        }
-      }
-    }
-    void tick()
-    t = setInterval(tick, 2000)
-    return () => {
-      stopRef.current = true
-      if (t) clearInterval(t)
-    }
-  }, [connId])
+  const { error } = useMonitorPoll<{ nets: NetIf[] }>(connId, (s) => setNets(s.nets ?? []))
 
   const rows = useMemo(() => {
     let list = [...nets]

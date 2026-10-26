@@ -1,8 +1,7 @@
 /**
- * 会话侧栏（图1：纯监控面板）
- * - 连上服务器后：同步状态 / 系统信息 / CPU内存交换 / 进程 / 磁盘 监控
- * - 未连接：显示「连接管理器」入口
- * - 已去掉"会话"标题与快速连接表单
+ * Monitor sidebar (left)
+ * - When connected: sync status / system info / CPU-memory-swap / processes / disks
+ * - When idle: shows the connection manager entry
  */
 import { useShell } from '../state/sessionStore'
 import { MonitorPanel } from './MonitorPanel'
@@ -11,7 +10,7 @@ interface Props {
   onOpenManager: () => void
 }
 
-export function SessionSidebar({ onOpenManager }: Props) {
+export function MonitorSidebar({ onOpenManager }: Props) {
   const activeId = useShell((s) => s.activeId)
 
   return (
@@ -25,7 +24,6 @@ export function SessionSidebar({ onOpenManager }: Props) {
           <button className="btn primary" onClick={onOpenManager}>
             打开连接管理器
           </button>
-          <p className="sidebar-idle-hint">或按 Ctrl+N 新建连接</p>
         </div>
       )}
     </aside>

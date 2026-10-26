@@ -1,6 +1,6 @@
 /**
- * 渲染进程全局类型声明
- * window.shellpro 由 preload 注入
+ * Renderer global type declarations
+ * window.shellpro is injected by the preload script
  */
 import type { ShellProApi } from '../preload/index'
 

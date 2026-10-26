@@ -1,7 +1,7 @@
 /**
- * 渲染层全局状态（zustand）
- * - 会话列表来自主进程 SQLite
- * - 连接生命周期：conn:create -> terminal:open -> terminal:input/close
+ * Renderer global state (zustand)
+ * - Session list comes from the main-process SQLite
+ * - Connection lifecycle: conn:create -> terminal:open -> terminal:input/close
  */
 import { create } from 'zustand'
 import { zhError } from '../lib/errors'
@@ -76,7 +76,7 @@ export const useShell = create<ShellProState>((set) => ({
 
   connect: async (opts) => {
     try {
-      // 1. 建立 SSH 连接
+      // 1. Establish the SSH connection
       const res = await window.shellpro.conn.create({
         host: opts.host,
         port: opts.port,
@@ -85,7 +85,7 @@ export const useShell = create<ShellProState>((set) => ({
         protocol: opts.protocol ?? 'ssh',
       })
       const connId = res.connId as string
-      // 2. 打开终端（ssh shell）
+      // 2. Open the terminal (ssh shell)
       await window.shellpro.terminal.open(connId)
       const active: ActiveConn = {
         connId,
@@ -120,6 +120,6 @@ export const useShell = create<ShellProState>((set) => ({
   clearError: () => set({ error: null }),
   setError: (msg) => set({ error: msg }),
 
-  // SFTP 路径导航（SSH cd 命令联动、面板目录跳转共用）
+  // SFTP path navigation (shared by SSH cd sync and panel directory jumps)
   sftpNavigate: (path) => set({ sftpPath: path }),
 }))

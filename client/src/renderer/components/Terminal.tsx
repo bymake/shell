@@ -1,10 +1,10 @@
 /**
- * xterm.js 终端组件
- * - 绑定主进程 SSH shell 数据流
- * - FitAddon 自适应窗口尺寸
- * - 右键菜单：复制 / 粘贴（剪贴板经主进程读写）
- * - cd 命令联动 SFTP：纯前端解析目标路径（不向 shell 注入任何命令，
- *   终端所见即用户所输），直接同步 store.sftpPath
+ * xterm.js terminal component
+ * - Binds to the SSH shell data stream of the main process
+ * - FitAddon adapts to the window size
+ * - Context menu: copy / paste (clipboard via the main process)
+ * - cd command syncs SFTP: pure front-end path resolution (nothing is injected into the
+ *   shell, WYSIWYG), directly updates store.sftpPath
  */
 import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
@@ -12,30 +12,13 @@ import { createPortal } from 'react-dom'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useShell } from '../state/sessionStore'
+import { norm, parentPath } from '../lib/path'
 
 interface Props {
   connId: string
 }
 
-// 路径规范化：/a/../b → /b；去 . 与重复斜杠
-function norm(p: string): string {
-  const out: string[] = []
-  for (const seg of p.split('/')) {
-    if (!seg || seg === '.') continue
-    if (seg === '..') out.pop()
-    else out.push(seg)
-  }
-  return '/' + out.join('/')
-}
-
-function parentPath(p: string): string {
-  if (p === '/') return '/'
-  const n = norm(p)
-  const i = n.lastIndexOf('/')
-  return i <= 0 ? '/' : n.slice(0, i)
-}
-
-/** 解析 cd 命令的目标路径；无法确定（~、无参、sudo 等）返回 null 不联动 */
+/** Resolve the target path of a cd command; returns null (no sync) when it cannot be determined (~, no arg, sudo, etc.) */
 function resolveCd(cmd: string, cur: string): string | null {
   const rest = cmd.slice(2).trim()
   if (!rest) return null
@@ -76,13 +59,13 @@ export function TerminalView({ connId }: Props) {
     fit.fit()
     termRef.current = term
 
-    // 主进程 -> 终端：原样显示
+    // Main process -> terminal: display as-is
     const offData = window.shellpro.terminal.onData(connId, (data) => term.write(data))
     const offExit = window.shellpro.terminal.onExit(connId, () => {
       term.write('\r\n\x1b[31m[会话已断开]\x1b[0m\r\n')
     })
 
-    // 终端 -> 主进程：原样透传；cd 命令前端解析联动 SFTP
+    // Terminal -> main process: pass through as-is; cd commands are parsed on the front end to sync SFTP
     const inputSub = term.onData((data) => {
       void window.shellpro.terminal.input(connId, data)
       if (data === '\r' || data === '\n') {
@@ -99,7 +82,7 @@ export function TerminalView({ connId }: Props) {
       }
     })
 
-    // Ctrl+C：有选中文字则复制到剪贴板（不发送 SIGINT）；Ctrl+V：粘贴剪贴板
+    // Ctrl+C: copy the selection to the clipboard (no SIGINT); Ctrl+V: paste from the clipboard
     term.attachCustomKeyEventHandler((e) => {
       const mod = e.ctrlKey || e.metaKey
       if (mod && e.key.toLowerCase() === 'c' && termRef.current?.getSelection()) {
@@ -107,13 +90,14 @@ export function TerminalView({ connId }: Props) {
         return false
       }
       if (mod && e.key.toLowerCase() === 'v') {
-        // 交给 xterm 原生粘贴（浏览器 paste 事件通道，与系统剪贴板同源），不走 IPC
+        // Leave it to xterm's native paste (browser paste event channel, same source as the
+        // system clipboard); do not go through IPC
         return false
       }
       return true
     })
 
-    // 尺寸自适应
+    // Size adaptation
     const onResize = () => {
       fit.fit()
       void window.shellpro.terminal.resize(connId, term.cols, term.rows)
@@ -122,7 +106,6 @@ export function TerminalView({ connId }: Props) {
     ro.observe(el)
     onResize()
 
-    // 初始写提示
     term.write('\x1b[2J\x1b[H\x1b[90m[ShellPro] 正在连接...\x1b[0m\r\n')
 
     return () => {
@@ -135,7 +118,7 @@ export function TerminalView({ connId }: Props) {
     }
   }, [connId])
 
-  // 右键菜单：复制 / 粘贴
+  // Context menu: copy / paste
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     const t = termRef.current
@@ -161,22 +144,22 @@ export function TerminalView({ connId }: Props) {
   }
 
   const doPaste = async () => {
-    // 关闭菜单后读取剪贴板并写入远程终端
+    // Close the menu, then read the clipboard and write it into the remote terminal
     setCtx(null)
     let text = ''
-    // 通道1：浏览器标准剪贴板 API（与快捷键原生粘贴同源，最可靠）
+    // Channel 1: browser standard clipboard API (same source as native Ctrl+V paste, most reliable)
     try {
       text = await navigator.clipboard.readText()
     } catch {
-      /* 无权或不可用，走下一通道 */
+      // no permission or unavailable; fall through
     }
-    // 通道2：主进程 IPC 多通道读取兜底
+    // Channel 2: main-process IPC multi-channel read as a fallback
     if (!text) {
       try {
         const res = (await window.shellpro.clipboard.readText()) as { text?: unknown } | undefined
         text = res && typeof res.text === 'string' ? res.text : ''
       } catch {
-        /* 忽略 */
+        // ignore
       }
     }
     if (!text) {
@@ -195,8 +178,8 @@ export function TerminalView({ connId }: Props) {
     fn()
   }
 
-  // 菜单动作统一由容器代理分发（mousedown/pointerdown/click 三通道），
-  // 不依赖按钮自身事件——任何一路事件到达都能命中 data-act 并执行
+  // Menu actions are dispatched by the container proxy (mousedown/pointerdown/click),
+  // independent of button events - any of these events can hit the data-act target
   const menuAct = (e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()

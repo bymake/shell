@@ -1,10 +1,10 @@
 /**
- * 进程 Top 弹窗（T4-2）
- * - 点击监控面板「进程」块弹出，展示更完整的 top 进程列表
- * - 每 2 秒采集一次，可按 CPU/内存/命令 排序，可过滤
+ * Process top modal (T4-2)
+ * - Opened by clicking the "Process" block of the monitor panel; shows a fuller top list
+ * - Collects every 2 seconds; sortable by CPU/memory/command and filterable
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { zhError } from '../lib/errors'
+import { useMemo, useState } from 'react'
+import { useMonitorPoll } from '../lib/useMonitorPoll'
 
 interface Proc {
   pid: number
@@ -30,41 +30,11 @@ interface Props {
 
 export function TopModal({ connId, onClose }: Props) {
   const [snap, setSnap] = useState<Snap | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('cpu')
   const [asc, setAsc] = useState(false)
   const [filter, setFilter] = useState('')
-  const stopRef = useRef(false)
 
-  useEffect(() => {
-    stopRef.current = false
-    let t: ReturnType<typeof setInterval> | null = null
-    const tick = async () => {
-      if (stopRef.current) return
-      try {
-        const s = (await window.shellpro.monitor.collect(connId)) as Snap
-        if (!stopRef.current) {
-          setSnap(s)
-          setError(null)
-        }
-      } catch (e) {
-        if (stopRef.current) return
-        if (/not connected/i.test(String(e))) {
-          setError('已断开')
-          stopRef.current = true
-          if (t) clearInterval(t)
-        } else {
-          setError(`采集失败：${zhError(e)}`)
-        }
-      }
-    }
-    void tick()
-    t = setInterval(tick, 2000)
-    return () => {
-      stopRef.current = true
-      if (t) clearInterval(t)
-    }
-  }, [connId])
+  const { error } = useMonitorPoll<Snap>(connId, setSnap)
 
   const rows = useMemo(() => {
     if (!snap) return []

@@ -1,6 +1,6 @@
 /**
- * 远程文本在线编辑（SFTP 右键「编辑」）
- * - 读取远程文本 → textarea 编辑 → 保存直接写回远程文件
+ * Remote text online editor (SFTP right-click "Edit")
+ * - Reads the remote text -> edits in a textarea -> saves directly back to the remote file
  */
 import { useEffect, useState } from 'react'
 import { zhError } from '../lib/errors'

@@ -1,9 +1,9 @@
 /**
- * 连接管理器（FinalShell 风格）
- * - 左侧：连接列表（搜索 / 双击连接 / 每行可删除）
- * - 右侧：单页表单（协议下拉 SSH/串口 + 名称/主机/端口/用户名/密码/备注），无标签页
- * - 密码：safeStorage 加密落盘（磁盘无明文），输入框恒显 8 星号
- * - 去重：相同 主机+端口+用户名 的连接不重复创建（存在则更新）
+ * Connection manager
+ * - Left: connection list (search / double-click to connect / per-row delete)
+ * - Right: single-page form (protocol dropdown SSH/serial + name/host/port/username/password/remark), no tabs
+ * - Password: encrypted with safeStorage on disk (no plaintext); input always shows 8 asterisks
+ * - Dedupe: same host+port+username is not created twice (updates instead)
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useShell, type Session } from '../state/sessionStore'
@@ -104,7 +104,7 @@ export function ConnManager({ open, onClose }: Props) {
     }
   }
 
-  // 保存：密码不落盘；相同 主机+端口+用户名 不重复创建
+  // Save: password is not stored in plaintext; same host+port+username is not created twice
   const save = async (): Promise<boolean> => {
     if (!form.name.trim() || !form.host.trim()) {
       setMsg({ text: '请填写名称与主机地址', err: true })
@@ -118,18 +118,18 @@ export function ConnManager({ open, onClose }: Props) {
       remark: form.remark,
       username: form.username,
       auth_type: 'password' as const,
-      // 密码明文仅内存传入，主进程用 safeStorage 加密后落盘，磁盘无明文
+      // Plaintext password is memory-only; the main process encrypts it with safeStorage on disk
       password: form.password || null,
     }
     try {
       if (form.id != null) {
-        // 编辑：更新当前
+        // Edit: update the current connection
         await window.shellpro.session.update(form.id, fields)
         setMsg({ text: '已保存', err: false })
         await load()
         return true
       }
-      // 新建：查重（同名主机+端口+用户名）
+      // New: dedupe by same host+port+username
       const dup = sessions.find(
         (s) => s.host === form.host && s.port === Number(form.port) && s.username === form.username,
       )
@@ -153,7 +153,7 @@ export function ConnManager({ open, onClose }: Props) {
     }
   }
 
-  // 连接：用表单里的（内存）密码直连，不依赖已保存密码
+  // Connect: use the in-memory form password directly, not the saved one
   const connectCurrent = async () => {
     if (!form.host.trim()) {
       setMsg({ text: '请先填写主机地址', err: true })
@@ -175,7 +175,7 @@ export function ConnManager({ open, onClose }: Props) {
     if (connId && closeAfterConnect) onClose()
   }
 
-  // 双击列表行连接：使用已保存（解密）密码直连
+  // Double-click a row to connect: uses the saved (decrypted) password
   const connectSession = async (s: Session) => {
     if (s.protocol === 'serial') {
       setMsg({ text: '串口连接需本机原生串口驱动，当前绿色版暂不支持', err: true })
@@ -204,7 +204,7 @@ export function ConnManager({ open, onClose }: Props) {
         </div>
 
         <div className="cm-body">
-          {/* 左侧列表 */}
+          {/* Left: connection list */}
           <div className="cm-left">
             <div className="cm-toolbar">
 
@@ -265,7 +265,7 @@ export function ConnManager({ open, onClose }: Props) {
             </div>
           </div>
 
-          {/* 右侧单页表单 */}
+          {/* Right: single-page form */}
           <div className="cm-right">
             <div className="cm-single">
               <div className="cm-frow">

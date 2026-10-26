@@ -1,11 +1,11 @@
 /**
- * 底层错误 → 中文提示映射
- * - 主进程 SSH 引擎抛出的底层错误多为英文（TypeError / ETIMEDOUT 等）
- * - 渲染层统一翻译为中文，满足「所有报错、提示均使用中文」
+ * Low-level error -> Chinese message mapping
+ * - Errors from the main-process SSH engine are mostly English (TypeError / ETIMEDOUT etc.)
+ * - The renderer translates them to Chinese so all messages are localized
  */
 export function zhError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
-  // 先从 IPC 错误信封里抽出真正的内层 message（形如 {"code":"ERR","message":"..."}）
+  // Extract the inner message from the IPC error envelope first (like {"code":"ERR","message":"..."})
   const innerMatch = /"message"\s*:\s*"([^"]+)"/.exec(raw)
   const primary = innerMatch ? innerMatch[1] : raw
   const map: Array<[RegExp, string]> = [
@@ -29,7 +29,7 @@ export function zhError(err: unknown): string {
   for (const [re, zh] of map) {
     if (re.test(primary)) return zh
   }
-  // 未命中映射：提取首段（去堆栈噪声），拼接中文前缀
+  // No match: take the first line (strip stack noise) and prefix a Chinese label
   const firstLine = primary.split('\n')[0]?.trim() || primary
   return `操作失败：${firstLine}`
 }

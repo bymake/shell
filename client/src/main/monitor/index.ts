@@ -1,8 +1,9 @@
 /**
- * 监控采集引擎（M-04 / T4-1 等）
- * - 通过 SSH 通道下发采集命令，解析 /proc/stat、/proc/net/dev、free、df、ps 为结构化 JSON
- * - 返回数据直接供 echarts 实时曲线使用
- * - CPU 使用率用相邻采样差分计算；其余即时采样
+ * Monitor collection engine (M-04 / T4-1 etc.)
+ * - Runs collection commands over the SSH channel and parses /proc/stat, /proc/net/dev,
+ *   free, df, ps into a structured JSON snapshot
+ * - Output feeds the echarts real-time curves directly
+ * - CPU usage is computed by differencing adjacent samples; the rest are instant samples
  */
 import { execCommand } from '../ssh/index'
 
@@ -76,7 +77,7 @@ const COLLECT_SCRIPT = `
 }
 `
 
-// 上一帧原始计数器（用于 CPU 差分），键 = 'total' 或 'core:i'
+// Previous-frame raw counters (for CPU differencing); keys = 'total' or 'core:i'
 let prevCounters = new Map<string, { total: number; idle: number }>()
 
 function diffCpuUsage(key: string, total: number, idle: number): number {
@@ -129,7 +130,7 @@ function parseCpu(lines: string[], loadLine: string): CpuSample {
 }
 
 function parseMem(lines: string[]): MemSample {
-  // free -b Mem 行字段：total used free shared buff/cache available
+  // free -b Mem line columns: total used free shared buff/cache available
   const mem = (lines.find((l) => l.startsWith('Mem:')) ?? '').split(/\s+/).map(Number)
   const swap = (lines.find((l) => l.startsWith('Swap:')) ?? '').split(/\s+/).map(Number)
   const total = mem[1] ?? 0
@@ -141,11 +142,11 @@ function parseMem(lines: string[]): MemSample {
     total,
     used,
     free,
-    buff: shared, // 字段保留兼容；真实含义见下方注释
+    buff: shared, // kept for compatibility; see note below
     cached: buffCache,
     swapTotal: swap[1] ?? 0,
     swapUsed: swap[2] ?? 0,
-    // 使用率按 free 的 used 口径（不含 buff/cache），避免叠加后超过 100%
+    // usage follows free's "used" semantics (excluding buff/cache) to avoid exceeding 100%
     usage: total === 0 ? 0 : (used / total) * 100,
   }
 }
@@ -195,7 +196,7 @@ function parseProc(lines: string[]): ProcSample[] {
     .filter((x): x is ProcSample => x !== null)
 }
 
-/** 采集一次全量监控快照 */
+/** Collect a full monitor snapshot */
 export async function collectSnapshot(connId: string): Promise<MonitorSnapshot> {
   const { stdout } = await execCommand(connId, COLLECT_SCRIPT)
   const sections = parseSections(stdout)

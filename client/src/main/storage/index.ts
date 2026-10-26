@@ -1,8 +1,9 @@
 /**
- * 本地存储层（node:sqlite · Node 内置，免编译）
- * - 使用 Electron 内置 Node 的 node:sqlite（Node 24+），无需原生模块编译，绿色版可直接运行
- * - 建表严格遵循开发文档第 6 节 DDL
- * - 会话 CRUD 供 conn 模块调用
+ * Local storage layer (node:sqlite - Node built-in, no compilation needed)
+ * - Uses the node:sqlite module (Node 24+) from Electron's bundled Node, so the
+ *   portable build runs without any native module compilation
+ * - Table schema follows section 6 DDL of the development doc
+ * - Session CRUD used by the conn module
  */
 import { DatabaseSync } from 'node:sqlite'
 import { app, safeStorage } from 'electron'
@@ -11,8 +12,8 @@ import { createLogger } from '../logger/index'
 
 const log = createLogger('storage')
 
-export type AuthType = 'password' | 'key'
-export type Protocol = 'ssh' | 'serial'
+type AuthType = 'password' | 'key'
+type Protocol = 'ssh' | 'serial'
 
 export interface SessionRow {
   id: number
@@ -49,21 +50,18 @@ export interface NewSession {
   group_id?: number | null
   jump_host?: string | null
   password_enc?: string | null
-  /** 明文密码（仅内存传入，写入时用 safeStorage 加密，磁盘不留明文） */
+  /** Plaintext password (memory only; encrypted with safeStorage on write, never stored in clear) */
   password?: string | null
   remark?: string | null
   private_key_path?: string | null
-  smart_accel?: number
-  exec_channel?: number
-  monitor_disabled?: number
 }
 
-// —— 密码安全：safeStorage（Windows=DPAPI）加密，磁盘上只有密文 ——
+// --- Password security: encrypted with safeStorage (DPAPI on Windows); only ciphertext on disk ---
 function encryptPw(plain: string): string | null {
   try {
     if (!plain) return null
     if (!safeStorage.isEncryptionAvailable()) {
-      // 不可用时退回 base64 混淆（仍不是明文），并打日志
+      // Fall back to base64 obfuscation (still not plaintext), and log it
       log.warn('safeStorage 不可用，使用 base64 存储')
       return Buffer.from(plain, 'utf8').toString('base64')
     }
@@ -103,19 +101,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   jump_host TEXT,
   password_enc TEXT,
   charset TEXT DEFAULT 'utf-8',
-  background_pic TEXT,
   sync_flag INTEGER DEFAULT 0,
-  updated_at TEXT,
-  FOREIGN KEY(group_id) REFERENCES session_groups(id)
+  updated_at TEXT
 );
-CREATE TABLE IF NOT EXISTS session_groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, parent_id INTEGER);
-CREATE TABLE IF NOT EXISTS quick_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, command TEXT, group_id INTEGER, params TEXT, sync_flag INTEGER DEFAULT 0);
-CREATE TABLE IF NOT EXISTS command_history (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, command TEXT, count INTEGER DEFAULT 1, last_used TEXT, sync_flag INTEGER DEFAULT 0);
-CREATE TABLE IF NOT EXISTS param_history (id INTEGER PRIMARY KEY AUTOINCREMENT, command_id INTEGER, params TEXT, count INTEGER DEFAULT 1, sync_flag INTEGER DEFAULT 0);
-CREATE TABLE IF NOT EXISTS path_history (id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT, count INTEGER DEFAULT 1, sync_flag INTEGER DEFAULT 0);
-CREATE TABLE IF NOT EXISTS ssh_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT, public_key TEXT, private_key_enc TEXT, passphrase_enc TEXT);
-CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT);
-CREATE TABLE IF NOT EXISTS sync_meta (id INTEGER PRIMARY KEY, device_id TEXT, last_pull_ts TEXT, last_push_ts TEXT);
 `
 
 let db: DatabaseSync | null = null
@@ -132,7 +120,7 @@ export function initStorage(): DatabaseSync {
   return db
 }
 
-/** 列级迁移：旧库补新列（ALTER ADD COLUMN 在列已存在时会抛错，需 try/catch 忽略） */
+/** Column-level migration: add missing columns to old DBs (ALTER ADD COLUMN throws if the column exists; ignore) */
 function migrate(): void {
   const db0 = db!
   const cols: Array<[string, string]> = [
@@ -147,7 +135,7 @@ function migrate(): void {
     try {
       db0.exec(`ALTER TABLE sessions ADD COLUMN ${name} ${def}`)
     } catch {
-      // 列已存在，忽略
+      // column already exists; ignore
     }
   }
 }
@@ -157,7 +145,7 @@ function getDb(): DatabaseSync {
   return db
 }
 
-/** 新增会话，返回新会话 id */
+/** Insert a session; returns the new session id */
 export function insertSession(s: NewSession): number {
   const stmt = getDb().prepare(
     `INSERT INTO sessions
@@ -178,14 +166,14 @@ export function insertSession(s: NewSession): number {
     password_enc: s.password != null ? encryptPw(s.password) : (s.password_enc ?? null),
     remark: s.remark ?? null,
     private_key_path: s.private_key_path ?? null,
-    smart_accel: s.smart_accel ?? 0,
-    exec_channel: s.exec_channel ?? 0,
-    monitor_disabled: s.monitor_disabled ?? 0,
+    smart_accel: 0,
+    exec_channel: 0,
+    monitor_disabled: 0,
   })
   return Number(r.lastInsertRowid)
 }
 
-/** 会话列表（默认不含已删除；includeDeleted 与搜索可选） */
+/** List sessions (excludes deleted by default; includeDeleted and search optional) */
 export function listSessions(opts: { includeDeleted?: boolean; search?: string } = {}): SessionRow[] {
   const { includeDeleted = false, search = '' } = opts
   const clauses: string[] = []
@@ -202,22 +190,15 @@ export function listSessions(opts: { includeDeleted?: boolean; search?: string }
   return rows.map((r) => ({ ...r, password: decryptPw(r.password_enc), password_enc: null }))
 }
 
-/** 按 id 取单条会话 */
-export function getSession(id: number): SessionRow | null {
-  const s = (getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined) ?? null
-  if (!s) return null
-  return { ...s, password: decryptPw(s.password_enc), password_enc: null }
-}
-
-/** 更新会话（仅更新传入的字段） */
+/** Update a session (only the passed fields are updated) */
 export function updateSession(id: number, fields: Partial<NewSession>): void {
   const allow = [
     'name', 'host', 'port', 'protocol', 'username', 'auth_type', 'group_id', 'jump_host',
-    'remark', 'private_key_path', 'smart_accel', 'exec_channel', 'monitor_disabled',
+    'remark', 'private_key_path',
   ]
   const set: string[] = []
   const args: Array<string | number | null> = []
-  // 密码：仅当传入非空明文时才更新（加密存储）；不传/为空则保持原密码
+  // Password: only updated when a non-empty plaintext is passed (stored encrypted); otherwise keep the old one
   if (fields.password != null && fields.password !== '') {
     set.push('password_enc = ?')
     args.push(encryptPw(fields.password))
@@ -237,7 +218,7 @@ export function updateSession(id: number, fields: Partial<NewSession>): void {
 }
 
 
-/** 删除会话 */
+/** Delete a session */
 export function deleteSession(id: number): void {
   getDb().prepare('DELETE FROM sessions WHERE id = ?').run(id)
 }

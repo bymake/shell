@@ -1,4 +1,4 @@
-# ShellPro 打包配置（electron-builder）
+# ShellPro packaging config (electron-builder)
 appId: com.shellpro.app
 productName: ShellPro
 electronLanguages:
@@ -12,13 +12,13 @@ files:
   - dist/**
   - dist-electron/**
 asar: true
-# 绿色版：不触发原生模块重编译（node:sqlite 免编译；ssh2 纯 JS）
+# Portable build: no native module rebuild (node:sqlite needs none; ssh2 is pure JS)
 npmRebuild: false
 asarUnpack:
   - "**/*.node"
 win:
   target:
-    # 绿色版：单文件 portable（免安装）+ dir（免安装目录）
+    # Portable build: single-file portable (no install) + dir (no install)
     - target: portable
       arch:
         - x64
