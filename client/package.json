@@ -6,6 +6,21 @@
   "description": "ShellPro - 开源的 SSH/SFTP 远程服务器管理终端（Electron 桌面客户端 + Go 云同步后端）",
   "main": "dist-electron/index.js",
   "author": "ShellPro",
+  "build": {
+    "appId": "com.shellpro.app",
+    "productName": "ShellPro",
+    "asar": true,
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "dir"
+      ]
+    }
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -13,16 +28,20 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
     "preview": "vite preview",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "agent-mcp": "tsx src/agent-mcp/server.ts"
   },
   "dependencies": {
-    "ssh2": "^1.17.0"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ssh2": "^1.17.0",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ssh2": "^1.15.6",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.1.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
@@ -32,6 +51,7 @@
     "oxlint": "^1.88.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vite": "^8.3.4",
     "vite-plugin-electron": "^1.1.2",

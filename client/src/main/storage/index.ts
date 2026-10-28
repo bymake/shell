@@ -104,6 +104,11 @@ CREATE TABLE IF NOT EXISTS sessions (
   sync_flag INTEGER DEFAULT 0,
   updated_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  k TEXT PRIMARY KEY,
+  v TEXT
+);
 `
 
 let db: DatabaseSync | null = null
@@ -221,6 +226,18 @@ export function updateSession(id: number, fields: Partial<NewSession>): void {
 /** Delete a session */
 export function deleteSession(id: number): void {
   getDb().prepare('DELETE FROM sessions WHERE id = ?').run(id)
+}
+
+// --- Generic key/value settings (agent token, app prefs, etc.) ---
+export function getSetting(k: string): string | null {
+  const r = getDb().prepare('SELECT v FROM settings WHERE k = ?').get(k) as { v: string } | undefined
+  return r ? r.v : null
+}
+
+export function setSetting(k: string, v: string): void {
+  getDb()
+    .prepare('INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v')
+    .run(k, v)
 }
 
 export function closeStorage(): void {

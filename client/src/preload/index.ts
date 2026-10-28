@@ -68,6 +68,16 @@ const api = {
       return () => ipcRenderer.removeListener(channel, listener)
     },
   },
+  agent: {
+    status: () => ipcRenderer.invoke('agent:status'),
+    resetToken: () => ipcRenderer.invoke('agent:resetToken'),
+    sendInput: (connId: string, data: string) => ipcRenderer.invoke('agent:input', { connId, data }),
+    onEvent: (cb: (event: Record<string, unknown>) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, event: Record<string, unknown>) => cb(event)
+      ipcRenderer.on('agent:event', listener)
+      return () => ipcRenderer.removeListener('agent:event', listener)
+    },
+  },
 }
 
 export type ShellProApi = typeof api

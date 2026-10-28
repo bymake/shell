@@ -106,6 +106,18 @@ export function closeConnection(id: ConnId): void {
   }
 }
 
+/** List all live connections (id + target), so an agent can reuse a session the
+ *  user already opened in the UI instead of creating its own connection. */
+export function listConnections(): Array<{ id: ConnId; host: string; port: number; username?: string; protocol?: 'ssh' | 'ssh2' }> {
+  return [...connections.values()].map((h) => ({
+    id: h.id,
+    host: h.opts.host,
+    port: h.opts.port,
+    username: h.opts.username || undefined,
+    protocol: h.opts.protocol,
+  }))
+}
+
 /** Open an interactive shell (for xterm binding); returns a read/write stream */
 export function openShell(id: ConnId): Promise<ClientChannel> {
   const h = getConnection(id)

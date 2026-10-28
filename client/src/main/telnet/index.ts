@@ -107,6 +107,17 @@ export function getTelnetConnection(id: string): TelnetHandle {
   return h
 }
 
+/** List all live telnet connections (id + target), for an agent to reuse the
+ *  session the user already opened in the UI. */
+export function listConnections(): Array<{ id: string; host: string; port: number; username?: string }> {
+  return [...connections.values()].map((h) => ({
+    id: h.id,
+    host: h.opts.host,
+    port: h.opts.port,
+    username: h.opts.username || undefined,
+  }))
+}
+
 export function closeTelnetConnection(id: string): void {
   const h = connections.get(id)
   if (h) {

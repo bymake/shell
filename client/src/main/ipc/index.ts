@@ -17,6 +17,7 @@ import {
   type TelnetHandle,
 } from '../telnet/index'
 import { collectSnapshot } from '../monitor/index'
+import { getAgentServer, resetAgentToken } from '../agent/index'
 import { insertSession, listSessions, deleteSession, updateSession, type NewSession } from '../storage/index'
 import { createLogger } from '../logger/index'
 
@@ -308,6 +309,27 @@ export function registerIpc(getWebContents: () => WebContents): void {
       return { ok: true }
     }),
   )
+
+  // ---------- Agent gateway status / token ----------
+  ipcMain.handle('agent:status', () => {
+    const s = getAgentServer()
+    return {
+      enabled: !!s,
+      running: s?.running ?? false,
+      port: s?.port ?? null,
+      token: s?.token ?? '',
+      url: s?.url ?? '',
+      wsUrl: s?.wsUrl ?? '',
+      connections: s?.listConns() ?? [],
+    }
+  })
+  ipcMain.handle('agent:resetToken', () => ({ token: resetAgentToken() }))
+  ipcMain.handle('agent:input', (_e, args: { connId?: string; data?: string }) => {
+    const s = getAgentServer()
+    if (!s || !s.writeShellInput) return { ok: false, error: 'agent 网关未启动' }
+    s.writeShellInput(String(args?.connId ?? ''), String(args?.data ?? ''))
+    return { ok: true }
+  })
 
   // ---------- Window controls (custom title bar) ----------
   ipcMain.handle('win:minimize', () => BrowserWindow.fromWebContents(getWebContents())?.minimize())

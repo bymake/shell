@@ -218,13 +218,15 @@ export function ConnManager({ open, onClose }: Props) {
           {/* Left: connection list */}
           <div className="cm-left">
             <div className="cm-toolbar">
-
               <input
                 className="cm-search"
                 placeholder="搜索名称/地址/用户名"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+              <button className="btn tiny cm-new" title="新建连接（清空表单）" onClick={newConn}>
+                ＋ 新建
+              </button>
             </div>
             <div className="cm-list">
               <div className="cm-list-head">

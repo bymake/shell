@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { initStorage, closeStorage } from './storage/index'
 import { registerIpc } from './ipc/index'
+import { initAgentServer, closeAgentServer } from './agent/index'
 import { closeAll } from './ssh/index'
 import { closeAllTelnet } from './telnet/index'
 import { createLogger } from './logger/index'
@@ -50,6 +51,11 @@ function createWindow(): void {
 app.whenReady().then(() => {
   initStorage()
   registerIpc(() => mainWindow?.webContents!)
+  // Start the agent gateway; every agent action is broadcast to the renderer as 'agent:event'
+  void initAgentServer((event) => {
+    const wc = mainWindow?.webContents
+    if (wc && !wc.isDestroyed()) wc.send('agent:event', event)
+  })
   // Frameless window: disable the native app menu; all interactions use the custom title bar
   Menu.setApplicationMenu(null)
   createWindow()
@@ -65,6 +71,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  closeAgentServer()
   closeAll()
   closeAllTelnet()
   closeStorage()

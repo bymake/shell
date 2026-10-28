@@ -33,6 +33,7 @@ export function TerminalView({ connId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const cmdBuf = useRef('')
+  const disconnectedRef = useRef(false)
   const [ctx, setCtx] = useState<{ x: number; y: number; sel: boolean } | null>(null)
 
   useEffect(() => {
@@ -59,14 +60,22 @@ export function TerminalView({ connId }: Props) {
     fit.fit()
     termRef.current = term
 
-    // Main process -> terminal: display as-is
+    // Main process -> terminal: display as-is; on exit mark the session as down
+    // so the tab shows "已断开" and Enter inside the terminal reconnects
     const offData = window.shellpro.terminal.onData(connId, (data) => term.write(data))
     const offExit = window.shellpro.terminal.onExit(connId, () => {
-      term.write('\r\n\x1b[31m[会话已断开]\x1b[0m\r\n')
+      disconnectedRef.current = true
+      useShell.getState().setDisconnected(connId, true)
+      term.write('\r\n\x1b[31m[会话已断开]\x1b[0m\r\n按回车键重新连接\r\n')
     })
 
     // Terminal -> main process: pass through as-is; cd commands are parsed on the front end to sync SFTP
     const inputSub = term.onData((data) => {
+      // A dropped session: Enter means reconnect (e.g. after issuing `reboot` remotely)
+      if (disconnectedRef.current) {
+        if (data === '\r' || data === '\n') void useShell.getState().reconnect(connId)
+        return
+      }
       void window.shellpro.terminal.input(connId, data)
       if (data === '\r' || data === '\n') {
         const cmd = cmdBuf.current.trim()
