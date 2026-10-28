@@ -22,6 +22,7 @@ export function zhError(err: unknown): string {
     [/permission denied \(publickey|publickey/i, '密钥认证失败，请检查密钥，或改用密码登录'],
     [/no matching.*(cipher|key exchange)|unsupported cipher|algorithm negotiation/i, '加密/密钥交换算法协商失败，两端协议不兼容'],
     [/not connected/i, '已断开'],
+    [/connection is closed by ssh server|closed by ssh server/i, '服务器关闭了连接：可能是协议/算法不兼容，请尝试选择 SSH2 协议'],
     [/no connection available|concurrency|连接数已达上限/i, '连接数已达上限，请稍后再试'],
     [/not an interactive shell|exec.*shell/i, '目标端不支持交互式 shell'],
     [/sftp.*(not supported|subsystem)|request for subsystem.*failed/i, '目标端未开启 SFTP 子系统'],

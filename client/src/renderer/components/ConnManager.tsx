@@ -14,10 +14,12 @@ interface Props {
   onClose: () => void
 }
 
-type Protocol = 'ssh' | 'serial'
+type Protocol = 'ssh' | 'ssh2' | 'telnet' | 'serial'
 
 const PROTOCOL_OPTIONS: Array<{ key: Protocol; label: string }> = [
   { key: 'ssh', label: 'SSH' },
+  { key: 'ssh2', label: 'SSH2' },
+  { key: 'telnet', label: 'Telnet' },
   { key: 'serial', label: '串口' },
 ]
 
@@ -40,7 +42,7 @@ export function ConnManager({ open, onClose }: Props) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [comPorts, setComPorts] = useState<string[]>([])
-  const [pwFocus, setPwFocus] = useState(false)
+  const [pwEdit, setPwEdit] = useState(false)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
 
   const load = useCallback(async () => {
@@ -75,20 +77,24 @@ export function ConnManager({ open, onClose }: Props) {
 
   const select = (s: Session) => {
     setSelectedId(s.id)
+    // Never load the saved plaintext into the form; the field only shows
+    // "saved" state (8 asterisks) unless the user explicitly edits the password
+    setPwEdit(false)
     setForm({
       id: s.id,
       name: s.name ?? '',
       host: s.host ?? '',
-      port: s.port ?? 22,
-      protocol: (s.protocol === 'serial' ? 'serial' : 'ssh') as Protocol,
+      port: s.port ?? (s.protocol === 'telnet' ? 23 : 22),
+      protocol: (s.protocol === 'ssh2' || s.protocol === 'telnet' || s.protocol === 'serial' ? s.protocol : 'ssh') as Protocol,
       remark: s.remark ?? '',
       username: s.username ?? 'root',
-      password: s.password ?? '',
+      password: '',
     })
   }
 
   const newConn = () => {
     setSelectedId(null)
+    setPwEdit(false)
     setForm(emptyForm)
   }
 
@@ -118,7 +124,8 @@ export function ConnManager({ open, onClose }: Props) {
       remark: form.remark,
       username: form.username,
       auth_type: 'password' as const,
-      // Plaintext password is memory-only; the main process encrypts it with safeStorage on disk
+      // Plaintext password is memory-only; the main process encrypts it with safeStorage on disk.
+      // Empty = keep the existing saved password (updateSession skips empty passwords)
       password: form.password || null,
     }
     try {
@@ -153,7 +160,7 @@ export function ConnManager({ open, onClose }: Props) {
     }
   }
 
-  // Connect: use the in-memory form password directly, not the saved one
+  // Connect: prefer the in-form password; fall back to the saved one (memory only)
   const connectCurrent = async () => {
     if (!form.host.trim()) {
       setMsg({ text: '请先填写主机地址', err: true })
@@ -164,12 +171,13 @@ export function ConnManager({ open, onClose }: Props) {
       return
     }
     setMsg(null)
+    const saved = form.id != null ? sessions.find((s) => s.id === form.id) : undefined
     const connId = await connect({
       name: form.name || `${form.username}@${form.host}`,
       host: form.host,
       port: Number(form.port) || 22,
       username: form.username || 'root',
-      password: form.password || undefined,
+      password: form.password || saved?.password || undefined,
       protocol: form.protocol,
     })
     if (connId && closeAfterConnect) onClose()
@@ -188,10 +196,13 @@ export function ConnManager({ open, onClose }: Props) {
       port: Number(s.port) || 22,
       username: s.username || 'root',
       password: s.password || undefined,
-      protocol: s.protocol === 'serial' ? 'serial' : 'ssh',
+      protocol: (s.protocol === 'ssh2' || s.protocol === 'telnet' || s.protocol === 'serial' ? s.protocol : 'ssh') as Protocol,
     })
     if (connId && closeAfterConnect) onClose()
   }
+
+  // True when the selected connection has a saved password (shows read-only 8 asterisks)
+  const savedPw = !!sessions.find((s) => s.id === form.id)?.password
 
   return (
     <div className="modal-mask" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -270,7 +281,20 @@ export function ConnManager({ open, onClose }: Props) {
             <div className="cm-single">
               <div className="cm-frow">
                 <span className="cm-frow-label">协议</span>
-                <select className="cm-proto-sel" value={form.protocol} onChange={(e) => setF({ protocol: e.target.value as Protocol })}>
+                <select
+                  className="cm-proto-sel"
+                  value={form.protocol}
+                  onChange={(e) => {
+                    const p = e.target.value as Protocol
+                    const port =
+                      p === 'telnet' && form.port === 22
+                        ? 23
+                        : p !== 'telnet' && form.port === 23
+                          ? 22
+                          : form.port
+                    setF({ protocol: p, port })
+                  }}
+                >
                   {PROTOCOL_OPTIONS.map((p) => (
                     <option key={p.key} value={p.key}>{p.label}</option>
                   ))}
@@ -300,21 +324,38 @@ export function ConnManager({ open, onClose }: Props) {
               </label>
               <label className="cm-frow">
                 <span className="cm-frow-label">密码</span>
-                <div className="pw-box">
-                  <input
-                    type="text"
-                    className="pw-real"
-                    value={form.password}
-                    onChange={(e) => setF({ password: e.target.value })}
-                    onFocus={() => setPwFocus(true)}
-                    onBlur={() => setPwFocus(false)}
-                    autoComplete="off"
-                  />
-                  <span className={`pw-mask ${form.password ? '' : 'empty'}`}>
-                    {form.password ? '********' : '加密保存'}
-                  </span>
-                  {pwFocus && <span className="pw-caret" />}
-                </div>
+                {savedPw && !pwEdit ? (
+                  <div className="pw-saved">
+                    <span className="pw-stars">********</span>
+                    <span className="pw-saved-tag">已保存</span>
+                    <button type="button" className="btn tiny" onClick={() => setPwEdit(true)}>
+                      修改
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pw-edit-actions">
+                    <input
+                      type="password"
+                      className="cm-input-flex"
+                      value={form.password}
+                      onChange={(e) => setF({ password: e.target.value })}
+                      placeholder={savedPw ? '留空则保持原密码' : '请输入密码'}
+                      autoComplete="off"
+                    />
+                    {savedPw && (
+                      <button
+                        type="button"
+                        className="btn tiny"
+                        onClick={() => {
+                          setPwEdit(false)
+                          setF({ password: '' })
+                        }}
+                      >
+                        取消
+                      </button>
+                    )}
+                  </div>
+                )}
               </label>
               <label className="cm-frow">
                 <span className="cm-frow-label">备注</span>

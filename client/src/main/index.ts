@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { initStorage, closeStorage } from './storage/index'
 import { registerIpc } from './ipc/index'
 import { closeAll } from './ssh/index'
+import { closeAllTelnet } from './telnet/index'
 import { createLogger } from './logger/index'
 
 const log = createLogger('main')
@@ -65,5 +66,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   closeAll()
+  closeAllTelnet()
   closeStorage()
 })

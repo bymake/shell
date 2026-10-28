@@ -3,7 +3,7 @@
  * - Password / private key (RSA/ECDSA/Ed25519) authentication
  * - Interactive shell (for the terminal) and exec (for monitor collection)
  */
-import { Client, type ClientChannel } from 'ssh2'
+import { Client, type ClientChannel, type Algorithms } from 'ssh2'
 import { randomUUID } from 'node:crypto'
 import { createLogger } from '../logger/index'
 
@@ -18,6 +18,8 @@ export interface ConnOptions {
   password?: string
   privateKey?: string
   passphrase?: string
+  /** 'ssh2' = legacy-compatible algorithms (H3C / old network gear); default = standard */
+  protocol?: 'ssh' | 'ssh2'
 }
 
 export interface ConnHandle {
@@ -28,11 +30,41 @@ export interface ConnHandle {
 
 const connections = new Map<ConnId, ConnHandle>()
 
+// Legacy-network compatibility: prepend old-school algorithms to ssh2's default
+// list (which is already filtered to what the runtime supports), so devices like
+// H3C Comware / old Cisco that only speak SHA-1 group KEX + CBC ciphers negotiate
+// successfully. We never replace the whole list — replacing it can trigger
+// "Unsupported algorithm" for entries the runtime OpenSSL/BoringSSL lacks
+// (e.g. chacha20-poly1305@openssh.com under Electron).
+// Partial keys are legal at runtime (ssh2 merges them into the default list);
+// the type cast exists only because @types/ssh2 declares all three keys required.
+const COMPAT_ALGORITHMS = {
+  kex: {
+    prepend: ['diffie-hellman-group14-sha1', 'diffie-hellman-group1-sha1', 'diffie-hellman-group-exchange-sha1'],
+  },
+  cipher: {
+    prepend: ['aes128-cbc', 'aes192-cbc', 'aes256-cbc', '3des-cbc'],
+  },
+  serverHostKey: {
+    prepend: ['ssh-rsa'],
+  },
+  hmac: {
+    prepend: ['hmac-sha1'],
+  },
+} as unknown as Algorithms
+
 function connectOne(opts: ConnOptions): Promise<Client> {
   return new Promise((resolve, reject) => {
     const c = new Client()
+    // Keep a permanent error listener: an SSH server may drop the connection at
+    // any time (DISCONNECT / handshake failure). Without a listener the error
+    // becomes an uncaught exception and Electron shows a native error dialog.
+    // `reject` is a no-op once the promise has resolved, so this is safe to keep.
+    c.on('error', (err) => {
+      log.error(`ssh client error: ${err instanceof Error ? err.message : String(err)}`)
+      reject(err)
+    })
     c.once('ready', () => resolve(c))
-    c.once('error', reject)
     c.connect({
       host: opts.host,
       port: opts.port,
@@ -40,6 +72,8 @@ function connectOne(opts: ConnOptions): Promise<Client> {
       readyTimeout: 20000,
       keepaliveInterval: 30000,
       keepaliveCountMax: 3,
+      // Compatibility algorithms only for the explicit "ssh2" protocol
+      ...(opts.protocol === 'ssh2' ? { algorithms: COMPAT_ALGORITHMS } : {}),
       ...(opts.password ? { password: opts.password } : {}),
       ...(opts.privateKey
         ? { privateKey: opts.privateKey, ...(opts.passphrase ? { passphrase: opts.passphrase } : {}) }

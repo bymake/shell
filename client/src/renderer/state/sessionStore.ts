@@ -23,7 +23,7 @@ export interface ActiveConn {
   host: string
   port: number
   username: string | null
-  protocol: 'ssh' | 'serial'
+  protocol: 'ssh' | 'ssh2' | 'telnet' | 'serial'
 }
 
 interface ShellProState {
@@ -38,7 +38,7 @@ interface ShellProState {
     port: number
     username: string
     password?: string
-    protocol: 'ssh' | 'serial'
+    protocol: 'ssh' | 'ssh2' | 'telnet' | 'serial'
   }) => Promise<string | null>
   disconnect: (connId: string) => Promise<void>
   setActive: (connId: string | null) => void

@@ -12,11 +12,23 @@ interface Props {
 
 export function MonitorSidebar({ onOpenManager }: Props) {
   const activeId = useShell((s) => s.activeId)
+  const activeConn = useShell((s) => s.activeConns.find((c) => c.connId === s.activeId))
+  const isShell = activeConn?.protocol === 'ssh' || activeConn?.protocol === 'ssh2'
 
   return (
     <aside className="sidebar">
       {activeId ? (
-        <MonitorPanel connId={activeId} />
+        isShell ? (
+          <MonitorPanel connId={activeId} />
+        ) : (
+          <div className="sidebar-idle">
+            <div className="sidebar-idle-title">ShellPro</div>
+            <p>Telnet 连接不支持系统监控</p>
+            <button className="btn primary" onClick={onOpenManager}>
+              打开连接管理器
+            </button>
+          </div>
+        )
       ) : (
         <div className="sidebar-idle">
           <div className="sidebar-idle-title">ShellPro</div>

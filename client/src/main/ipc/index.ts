@@ -9,6 +9,13 @@ import { execFile } from 'node:child_process'
 import type { ClientChannel } from 'ssh2'
 import { createConnection, closeConnection, openShell, type ConnId } from '../ssh/index'
 import { listDir, uploadFile, downloadFile, readTextFile, writeTextFile, closeSftp } from '../sftp/index'
+import {
+  createTelnetConnection,
+  getTelnetConnection,
+  closeTelnetConnection,
+  telnetFilter,
+  type TelnetHandle,
+} from '../telnet/index'
 import { collectSnapshot } from '../monitor/index'
 import { insertSession, listSessions, deleteSession, updateSession, type NewSession } from '../storage/index'
 import { createLogger } from '../logger/index'
@@ -40,6 +47,45 @@ function send(wc: WebContents, channel: string, payload: unknown): void {
   if (!wc.isDestroyed()) wc.send(channel, payload)
 }
 
+function isTelnet(connId: string): boolean {
+  try {
+    getTelnetConnection(connId)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Auto-login for telnet: watch for Username:/Password: prompts and answer them */
+function attachTelnetAutoLogin(h: TelnetHandle, wc: WebContents, connId: string): void {
+  const buf: Buffer[] = []
+  let sentUser = false
+  let sentPass = false
+
+  h.socket.on('data', (raw: Buffer) => {
+    const clean = telnetFilter(h, raw)
+    if (clean.length === 0) return
+    if (h.authed || !h.opts.username) {
+      send(wc, `terminal:data:${connId}`, clean.toString('utf-8'))
+      return
+    }
+    buf.push(clean)
+    if (buf.length > 64) buf.shift()
+    const text = Buffer.concat(buf).toString('utf-8')
+    if (!sentUser && /(username|login)\s*[:：]\s*$/im.test(text)) {
+      sentUser = true
+      h.socket.write(`${h.opts.username}\r\n`)
+    } else if (!sentPass && /password\s*[:：]\s*$/im.test(text)) {
+      sentPass = true
+      if (h.opts.password) h.socket.write(`${h.opts.password}\r\n`)
+      h.authed = true
+      buf.length = 0
+    }
+    // Forward what the device sent (prompts and echoed input)
+    send(wc, `terminal:data:${connId}`, clean.toString('utf-8'))
+  })
+}
+
 export function registerIpc(getWebContents: () => WebContents): void {
   // ---------- Connections & sessions ----------
   ipcMain.handle('conn:create', (_e, opts) =>
@@ -47,6 +93,15 @@ export function registerIpc(getWebContents: () => WebContents): void {
       const protocol = (opts?.protocol as string | undefined) ?? 'ssh'
       if (protocol === 'serial') {
         return err(new Error('串口连接需本机原生串口驱动，当前绿色版暂不支持'))
+      }
+      if (protocol === 'telnet') {
+        const h = await createTelnetConnection({
+          host: opts.host,
+          port: opts.port ?? 23,
+          username: opts.username,
+          password: opts.password,
+        })
+        return { connId: h.id }
       }
       const conn = await createConnection(opts)
       return { connId: conn.id }
@@ -59,6 +114,7 @@ export function registerIpc(getWebContents: () => WebContents): void {
       if (t?.sshStream) t.sshStream.destroy()
       terminals.delete(connId)
       closeSftp(connId)
+      closeTelnetConnection(connId)
       closeConnection(connId)
       return { ok: true }
     }),
@@ -110,6 +166,7 @@ export function registerIpc(getWebContents: () => WebContents): void {
     if (collecting.has(connId)) return { skipped: true }
     collecting.add(connId)
     try {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持系统监控'))
       return await collectSnapshot(connId)
     } catch (e) {
       return err(e)
@@ -119,24 +176,35 @@ export function registerIpc(getWebContents: () => WebContents): void {
   })
 
   // ---------- SFTP ----------
-  ipcMain.handle('sftp:list', (_e, connId: ConnId, path: string) => handle(() => listDir(connId, path)))
+  ipcMain.handle('sftp:list', (_e, connId: ConnId, path: string) =>
+    handle(() => {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
+      return listDir(connId, path)
+    }),
+  )
   ipcMain.handle('sftp:upload', (_e, connId: ConnId, localPath: string, remotePath: string) =>
     handle(async () => {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
       await uploadFile(connId, localPath, remotePath)
       return { ok: true }
     }),
   )
   ipcMain.handle('sftp:download', (_e, connId: ConnId, remotePath: string, localPath: string) =>
     handle(async () => {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
       await downloadFile(connId, remotePath, localPath)
       return { ok: true }
     }),
   )
   ipcMain.handle('sftp:readText', (_e, connId: ConnId, remotePath: string) =>
-    handle(async () => ({ content: await readTextFile(connId, remotePath) })),
+    handle(async () => {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
+      return { content: await readTextFile(connId, remotePath) }
+    }),
   )
   ipcMain.handle('sftp:writeText', (_e, connId: ConnId, remotePath: string, content: string) =>
     handle(async () => {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
       await writeTextFile(connId, remotePath, content)
       return { ok: true }
     }),
@@ -186,10 +254,16 @@ export function registerIpc(getWebContents: () => WebContents): void {
     }
   })
 
-  // ---------- Terminal (remote SSH shell) ----------
+  // ---------- Terminal (remote SSH shell / telnet) ----------
   ipcMain.handle('terminal:open', (_e, connId: ConnId) =>
     handle(async () => {
       const wc = getWebContents()
+      if (isTelnet(connId)) {
+        const h = getTelnetConnection(connId)
+        attachTelnetAutoLogin(h, wc, connId)
+        h.socket.on('close', () => send(wc, `terminal:exit:${connId}`, { code: 0 }))
+        return { connId }
+      }
       const stream = await openShell(connId)
 
       terminals.set(connId, { connId, sshStream: stream })
@@ -201,6 +275,10 @@ export function registerIpc(getWebContents: () => WebContents): void {
 
   ipcMain.handle('terminal:input', (_e, connId: ConnId, data: string) =>
     handle(() => {
+      if (isTelnet(connId)) {
+        getTelnetConnection(connId).socket.write(data)
+        return { ok: true }
+      }
       const t = terminals.get(connId)
       if (!t) return err(new Error('终端未打开'))
       t.sshStream?.write(data)
@@ -210,6 +288,7 @@ export function registerIpc(getWebContents: () => WebContents): void {
 
   ipcMain.handle('terminal:resize', (_e, connId: ConnId, cols: number, rows: number) =>
     handle(() => {
+      if (isTelnet(connId)) return { ok: true }
       const t = terminals.get(connId)
       if (!t) return err(new Error('终端未打开'))
       t.sshStream?.setWindow?.(rows, cols, cols, rows)
@@ -219,6 +298,10 @@ export function registerIpc(getWebContents: () => WebContents): void {
 
   ipcMain.handle('terminal:close', (_e, connId: ConnId) =>
     handle(() => {
+      if (isTelnet(connId)) {
+        closeTelnetConnection(connId)
+        return { ok: true }
+      }
       const t = terminals.get(connId)
       if (t?.sshStream) t.sshStream.destroy()
       terminals.delete(connId)

@@ -31,6 +31,16 @@ function App() {
     void loadSessions()
   }, [loadSessions])
 
+  const activeConn = activeConns.find((c) => c.connId === activeId)
+  const isShell = activeConn?.protocol === 'ssh' || activeConn?.protocol === 'ssh2'
+
+  // Auto-close the error toast after 5 seconds
+  useEffect(() => {
+    if (!error) return
+    const t = setTimeout(clearError, 5000)
+    return () => clearTimeout(t)
+  }, [error, clearError])
+
   // Draggable split divider
   const onDividerDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -129,7 +139,7 @@ function App() {
             </div>
           ) : (
             <div className="split-vert">
-              <div className="split-top" style={{ height: `${ratio}%` }}>
+              <div className="split-top" style={{ height: isShell ? `${ratio}%` : '100%' }}>
                 <div className="tab-strip">
                   {activeConns.map((c) => (
                     <div
@@ -156,10 +166,14 @@ function App() {
                 </div>
                 {activeId && <TerminalView key={`ssh-${activeId}`} connId={activeId} />}
               </div>
-              <div className="split-divider" onMouseDown={onDividerDown} />
-              <div className="split-bottom">
-                {activeId && <SftpPanel key={`sftp-${activeId}`} connId={activeId} />}
-              </div>
+              {isShell && (
+                <>
+                  <div className="split-divider" onMouseDown={onDividerDown} />
+                  <div className="split-bottom">
+                    {activeId && <SftpPanel key={`sftp-${activeId}`} connId={activeId} />}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </main>

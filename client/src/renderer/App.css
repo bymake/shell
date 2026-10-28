@@ -255,22 +255,34 @@ body {
 }
 
 
-/* ---------- Error toast ---------- */
+/* ---------- Error toast (top-most layer, auto-close) ---------- */
 .error-toast {
   position: fixed;
-  bottom: 16px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
   background: #da3633;
   color: #fff;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-radius: 8px;
   font-size: 13px;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  animation: toast-in 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .error-toast button {
@@ -486,14 +498,12 @@ body {
 /* Tab strip add button */
 .tab-add { background: transparent; border: none; color: #8b949e; font-size: 16px; width: 32px; cursor: pointer; border-radius: 4px; align-self: center; margin-left: 2px; }
 .tab-add:hover { background: #21262d; color: #f0f6fc; }
-/* Password mask: always 8 asterisks */
-.pw-box { position: relative; flex: 1; }
-.pw-box input.pw-real { width: 100%; background: #161b22; border: 1px solid #30363d; color: transparent; caret-color: transparent; padding: 7px 9px; font-size: 13px; border-radius: 6px; }
-.pw-box input.pw-real:focus { border-color: #1f6feb; outline: none; }
-.pw-mask { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: #e6edf3; pointer-events: none; font-size: 13px; letter-spacing: 1px; }
-.pw-mask.empty { color: #6e7681; }
-.pw-caret { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); width: 2px; height: 15px; background: #58a6ff; pointer-events: none; animation: pw-blink 1s step-end infinite; }
-@keyframes pw-blink { 50% { opacity: 0; } }
+/* Saved password: read-only 8-asterisk marker, never editable or selectable */
+.pw-saved { flex: 1; display: flex; align-items: center; gap: 8px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 6px 9px; min-height: 34px; }
+.pw-stars { color: #e6edf3; font-size: 13px; letter-spacing: 1px; user-select: none; }
+.pw-saved-tag { color: #3fb950; font-size: 11px; }
+.pw-edit-actions { display: flex; align-items: center; gap: 6px; flex: 1; }
+.cm-input-flex { flex: 1; min-width: 0; }
 /* Process grid: whole block clickable to open top */
 .m-proc-grid { cursor: pointer; border: 1px solid transparent; border-radius: 6px; margin-bottom: 8px; }
 .m-proc-grid:hover { border-color: #21262d; background: rgba(22,27,34,0.5); }

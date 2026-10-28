@@ -13,7 +13,7 @@ import { createLogger } from '../logger/index'
 const log = createLogger('storage')
 
 type AuthType = 'password' | 'key'
-type Protocol = 'ssh' | 'serial'
+type Protocol = 'ssh' | 'ssh2' | 'telnet' | 'serial'
 
 export interface SessionRow {
   id: number
