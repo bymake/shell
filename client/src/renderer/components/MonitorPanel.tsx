@@ -36,14 +36,13 @@ export function MonitorPanel({ connId }: { connId: string }) {
   // Latest real-time up/down speed (B/s), shown under the chart
   const [speed, setSpeed] = useState<{ rx: number; tx: number }>({ rx: 0, tx: 0 })
 
-  // Discrete y-axis tiers (MB/s), like Task Manager's network page: the axis snaps to
-  // the smallest tier that covers the recent peak (10 → 100 → 200 → 400 → … → NIC limit)
-  const Y_TIERS_MBPS = [10, 100, 200, 400, 800, 1600, 3200, 6400]
-  function pickYMaxBps(peakBps: number): number {
-    const peakMb = peakBps / 1048576
-    for (const t of Y_TIERS_MBPS) if (peakMb <= t) return t * 1048576
-    return Y_TIERS_MBPS[Y_TIERS_MBPS.length - 1] * 1048576
-  }
+  // Discrete y-axis tiers (MB/s): start at 1M and double up to a 10G ceiling. The axis
+  // only steps up when the recent peak exceeds half the current max; it steps down (with
+  // hysteresis + debounce) only after the peak stays below a quarter for 3 samples.
+  const Y_TIERS_MBPS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 10240]
+  // Current tier index (0 => 1M) and a debounce counter for stepping down
+  const tierIdxRef = useRef(0)
+  const downCountRef = useRef(0)
 
   // Sum rx/tx over all non-loopback interfaces (total up/down throughput)
   function netTotals(nets: Snapshot['nets']): { rx: number; tx: number } {
@@ -88,9 +87,26 @@ export function MonitorPanel({ connId }: { connId: string }) {
       })
     const dl = rateSeries('rx')
     const ul = rateSeries('tx')
-    // Peak over the 60s window picks the y-axis tier
+    // Peak over the 60s window drives the tier up/down (hysteresis + debounce)
     let peak = 0
     for (const [, v] of [...dl, ...ul]) if (v > peak) peak = v
+    const lastTierIdx = Y_TIERS_MBPS.length - 1
+    const curMaxBps = Y_TIERS_MBPS[tierIdxRef.current] * 1048576
+    if (tierIdxRef.current < lastTierIdx && peak > curMaxBps / 2) {
+      // rate exceeded half the current max → step up immediately (don't clip the curve)
+      tierIdxRef.current++
+      downCountRef.current = 0
+    } else if (tierIdxRef.current > 0 && peak < curMaxBps / 4) {
+      // peak stayed below a quarter of the current max for 3 samples → step down (debounced)
+      downCountRef.current++
+      if (downCountRef.current >= 3) {
+        tierIdxRef.current--
+        downCountRef.current = 0
+      }
+    } else {
+      downCountRef.current = 0
+    }
+    const tierMaxBps = Y_TIERS_MBPS[tierIdxRef.current] * 1048576
     const now = Date.now()
     chart.setOption({
       backgroundColor: 'transparent',
@@ -105,11 +121,12 @@ export function MonitorPanel({ connId }: { connId: string }) {
         axisLine: { lineStyle: { color: '#30363d' } },
         splitLine: { show: false },
       },
-      // Task-Manager-style tiered y-axis: fixed tiers, not continuous rescaling
+      // Tiered y-axis: 0 at the bottom + 3 even ticks above (⅓, ⅔, max), integers only
       yAxis: {
         type: 'value',
         min: 0,
-        max: pickYMaxBps(peak),
+        max: tierMaxBps,
+        splitNumber: 3,
         axisLabel: { color: '#8b949e', fontSize: 9, formatter: (v: number) => fmtRateInt(v) },
         splitLine: { lineStyle: { color: '#21262d' } },
       },
