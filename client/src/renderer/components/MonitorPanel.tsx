@@ -30,34 +30,94 @@ export function MonitorPanel({ connId }: { connId: string }) {
   const [topOpen, setTopOpen] = useState(false)
   const [netOpen, setNetOpen] = useState(false)
   const chartRef = useRef<HTMLDivElement>(null)
-  const history = useRef<{ t: number; cpu: number; mem: number }[]>([])
+  // Network throughput history: cumulative rx/tx bytes (diffed into B/s for the chart)
+  // Kept to the last 60s window so the time axis scrolls instead of growing forever.
+  const history = useRef<{ t: number; rx: number; tx: number }[]>([])
+  // Latest real-time up/down speed (B/s), shown under the chart
+  const [speed, setSpeed] = useState<{ rx: number; tx: number }>({ rx: 0, tx: 0 })
+
+  // Discrete y-axis tiers (MB/s), like Task Manager's network page: the axis snaps to
+  // the smallest tier that covers the recent peak (10 → 100 → 200 → 400 → … → NIC limit)
+  const Y_TIERS_MBPS = [10, 100, 200, 400, 800, 1600, 3200, 6400]
+  function pickYMaxBps(peakBps: number): number {
+    const peakMb = peakBps / 1048576
+    for (const t of Y_TIERS_MBPS) if (peakMb <= t) return t * 1048576
+    return Y_TIERS_MBPS[Y_TIERS_MBPS.length - 1] * 1048576
+  }
+
+  // Sum rx/tx over all non-loopback interfaces (total up/down throughput)
+  function netTotals(nets: Snapshot['nets']): { rx: number; tx: number } {
+    let rx = 0
+    let tx = 0
+    for (const n of nets) {
+      if (n.iface === 'lo') continue
+      rx += n.rxBytes || 0
+      tx += n.txBytes || 0
+    }
+    return { rx, tx }
+  }
+
+  function fmtRate(bps: number): string {
+    if (!Number.isFinite(bps)) return '0 B/s'
+    const abs = Math.abs(bps)
+    if (abs >= 1048576) return (bps / 1048576).toFixed(2) + ' MB/s'
+    if (abs >= 1024) return (bps / 1024).toFixed(1) + ' KB/s'
+    return bps.toFixed(0) + ' B/s'
+  }
+
+  // Integer formatting for the y-axis tick labels (no decimals)
+  function fmtRateInt(bps: number): string {
+    if (!Number.isFinite(bps)) return '0 B/s'
+    if (bps >= 1048576) return Math.round(bps / 1048576) + ' MB/s'
+    if (bps >= 1024) return Math.round(bps / 1024) + ' KB/s'
+    return Math.round(bps) + ' B/s'
+  }
 
   function drawChart() {
     const el = chartRef.current
     if (!el || history.current.length < 2) return
     const chart = echarts.getInstanceByDom(el) ?? echarts.init(el)
     const h = history.current
+    // Diff cumulative counters into B/s, aligned with each sample's timestamp
+    const rateSeries = (key: 'rx' | 'tx'): Array<[number, number]> =>
+      h.map((p, i) => {
+        if (i === 0) return [p.t, 0]
+        const dt = (p.t - h[i - 1].t) / 1000
+        if (dt <= 0) return [p.t, 0]
+        return [p.t, Math.max(0, (p[key] - h[i - 1][key]) / dt)]
+      })
+    const dl = rateSeries('rx')
+    const ul = rateSeries('tx')
+    // Peak over the 60s window picks the y-axis tier
+    let peak = 0
+    for (const [, v] of [...dl, ...ul]) if (v > peak) peak = v
+    const now = Date.now()
     chart.setOption({
       backgroundColor: 'transparent',
-      grid: { left: 30, right: 8, top: 10, bottom: 22 },
-      tooltip: { trigger: 'axis' },
+      grid: { left: 44, right: 8, top: 10, bottom: 6 },
+      tooltip: { trigger: 'axis', valueFormatter: (v: number) => fmtRate(v) },
+      // Time axis: rolling 60s window, no tick labels at the bottom
       xAxis: {
-        type: 'category',
-        data: h.map((p) => new Date(p.t).toLocaleTimeString('zh-CN', { hour12: false })),
-        axisLabel: { color: '#8b949e', fontSize: 9 },
+        type: 'time',
+        min: now - 60000,
+        max: now,
+        axisLabel: { show: false },
         axisLine: { lineStyle: { color: '#30363d' } },
+        splitLine: { show: false },
       },
+      // Task-Manager-style tiered y-axis: fixed tiers, not continuous rescaling
       yAxis: {
         type: 'value',
-        max: 100,
-        axisLabel: { color: '#8b949e', fontSize: 9 },
+        min: 0,
+        max: pickYMaxBps(peak),
+        axisLabel: { color: '#8b949e', fontSize: 9, formatter: (v: number) => fmtRateInt(v) },
         splitLine: { lineStyle: { color: '#21262d' } },
       },
       series: [
         {
-          name: 'CPU',
+          name: '下载',
           type: 'line',
-          data: h.map((p) => Number(p.cpu.toFixed(1))),
+          data: dl,
           smooth: true,
           showSymbol: false,
           lineStyle: { color: '#58a6ff', width: 1.5 },
@@ -65,14 +125,14 @@ export function MonitorPanel({ connId }: { connId: string }) {
           areaStyle: { color: 'rgba(88,166,255,0.15)' },
         },
         {
-          name: '内存',
+          name: '上传',
           type: 'line',
-          data: h.map((p) => Number(p.mem.toFixed(1))),
+          data: ul,
           smooth: true,
           showSymbol: false,
-          lineStyle: { color: '#3fb950', width: 1.5 },
-          itemStyle: { color: '#3fb950' },
-          areaStyle: { color: 'rgba(63,185,80,0.15)' },
+          lineStyle: { color: '#f0883e', width: 1.5 },
+          itemStyle: { color: '#f0883e' },
+          areaStyle: { color: 'rgba(240,136,62,0.15)' },
         },
       ],
     })
@@ -80,8 +140,19 @@ export function MonitorPanel({ connId }: { connId: string }) {
 
   const { error } = useMonitorPoll<Snapshot>(connId, (s) => {
     setSnap(s)
-    history.current.push({ t: s.ts, cpu: s.cpu.usage, mem: s.mem.usage })
-    if (history.current.length > 60) history.current.shift()
+    const { rx, tx } = netTotals(s.nets)
+    const t = s.ts
+    history.current.push({ t, rx, tx })
+    // keep only the last 60s
+    while (history.current.length > 0 && t - history.current[0].t > 60000) history.current.shift()
+    // latest real-time speed = last diff
+    const n = history.current.length
+    if (n >= 2) {
+      const last = history.current[n - 1]
+      const prev = history.current[n - 2]
+      const dt = (last.t - prev.t) / 1000
+      if (dt > 0) setSpeed({ rx: Math.max(0, (last.rx - prev.rx) / dt), tx: Math.max(0, (last.tx - prev.tx) / dt) })
+    }
     drawChart()
   })
 
@@ -158,6 +229,15 @@ export function MonitorPanel({ connId }: { connId: string }) {
           </div>
 
           <div ref={chartRef} className="mon-chart" />
+          <div
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: 10, color: '#8b949e', padding: '0 8px', lineHeight: '16px',
+            }}
+          >
+            <span style={{ color: '#58a6ff' }}>⬇ 接收 {fmtRate(speed.rx)}</span>
+            <span style={{ color: '#f0883e' }}>⬆ 发送 {fmtRate(speed.tx)}</span>
+          </div>
 
           <div className="m-proc-grid" onClick={() => setTopOpen(true)}>
             <div className="m-sub proc-block">

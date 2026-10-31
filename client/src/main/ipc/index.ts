@@ -8,7 +8,7 @@ import { ipcMain, dialog, clipboard, BrowserWindow, type WebContents } from 'ele
 import { execFile } from 'node:child_process'
 import type { ClientChannel } from 'ssh2'
 import { createConnection, closeConnection, openShell, type ConnId } from '../ssh/index'
-import { listDir, uploadFile, downloadFile, readTextFile, writeTextFile, closeSftp } from '../sftp/index'
+import { listDir, uploadFile, downloadFile, readTextFile, writeTextFile, deletePath, closeSftp } from '../sftp/index'
 import {
   createTelnetConnection,
   getTelnetConnection,
@@ -207,6 +207,13 @@ export function registerIpc(getWebContents: () => WebContents): void {
     handle(async () => {
       if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
       await writeTextFile(connId, remotePath, content)
+      return { ok: true }
+    }),
+  )
+  ipcMain.handle('sftp:delete', (_e, connId: ConnId, remotePath: string) =>
+    handle(async () => {
+      if (isTelnet(connId)) return err(new Error('Telnet 连接不支持 SFTP 文件管理'))
+      await deletePath(connId, remotePath)
       return { ok: true }
     }),
   )

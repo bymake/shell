@@ -153,3 +153,34 @@ export async function writeTextFile(connId: string, remotePath: string, content:
     })
   })
 }
+
+/** Recursively delete a remote directory (the ssh2 typings expose no recursive rmdir) */
+async function rmdirRecursive(sftp: SftpSession, dir: string): Promise<void> {
+  const entries = await new Promise<Array<{ filename: string; attrs: import('ssh2').Stats }>>((resolve, reject) => {
+    sftp.readdir(dir, (err, list) => (err ? reject(err) : resolve(list)))
+  })
+  for (const e of entries) {
+    if (e.filename === '.' || e.filename === '..') continue
+    const p = dir === '/' ? `/${e.filename}` : `${dir}/${e.filename}`
+    if (e.attrs.isDirectory()) await rmdirRecursive(sftp, p)
+    else
+      await new Promise<void>((resolve, reject) =>
+        sftp.unlink(p, (err) => (err ? reject(err) : resolve())),
+      )
+  }
+  await new Promise<void>((resolve, reject) => sftp.rmdir(dir, (err) => (err ? reject(err) : resolve())))
+}
+
+/** Delete a remote file (unlink) or directory (recursive) */
+export async function deletePath(connId: string, remotePath: string): Promise<void> {
+  const sftp = await openSftp(connId)
+  const dest = safeRemote(remotePath)
+  const attrs = await new Promise<import('ssh2').Stats>((resolve, reject) => {
+    sftp.stat(dest, (err, st) => (err ? reject(err) : resolve(st)))
+  })
+  if (attrs.isDirectory()) await rmdirRecursive(sftp, dest)
+  else
+    await new Promise<void>((resolve, reject) =>
+      sftp.unlink(dest, (err) => (err ? reject(err) : resolve())),
+    )
+}

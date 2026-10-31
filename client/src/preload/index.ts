@@ -33,6 +33,7 @@ const api = {
     readText: (connId: string, remotePath: string) => ipcRenderer.invoke('sftp:readText', connId, remotePath),
     writeText: (connId: string, remotePath: string, content: string) =>
       ipcRenderer.invoke('sftp:writeText', connId, remotePath, content),
+    delete: (connId: string, remotePath: string) => ipcRenderer.invoke('sftp:delete', connId, remotePath),
   },
   clipboard: {
     readText: () => ipcRenderer.invoke('clipboard:readText'),

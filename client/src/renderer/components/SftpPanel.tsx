@@ -233,9 +233,60 @@ export function SftpPanel({ connId }: Props) {
     setCtx({ x: e.clientX, y: e.clientY, entry })
   }
 
+  // Remove a node from the (already loaded) tree after a successful delete, so the
+  // left tree stays in sync with the right list without a full reload
+  const removeFromTree = (targetPath: string) => {
+    const root = treeRef.current
+    if (!root) return
+    const walk = (nodes: TreeNode[]): boolean => {
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i]
+        if (n.path === targetPath) {
+          nodes.splice(i, 1)
+          return true
+        }
+        if (n.children && walk(n.children)) return true
+      }
+      return false
+    }
+    if (walk(root.children ?? [])) setTree({ ...root })
+  }
+
+  const del = async (name: string) => {
+    if (!window.confirm(`确认删除 ${name} ？此操作不可恢复`)) return
+    const src = join(sftpPath, name)
+    setMsg(`正在删除 ${name} …`)
+    try {
+      await window.shellpro.sftp.delete(connId, src)
+      setMsg(`已删除 ${name}`)
+      await load(sftpPath)
+      removeFromTree(src)
+    } catch (e) {
+      setMsg(`删除失败：${zhError(e)}`)
+    }
+  }
+
+  // Rebuild the left tree from scratch (external changes / manual refresh)
+  const refreshTree = () => {
+    treeRef.current = null
+    setTree(null)
+    void ensurePath(sftpPath === '.' ? '/' : sftpPath)
+  }
+
   return (
     <div className="sftp-panel">
       <div className="sftp-tree">
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '4px 8px', borderBottom: '1px solid #21262d', fontSize: 12, color: '#8b949e',
+          }}
+        >
+          <span>目录</span>
+          <button className="btn tiny" onClick={refreshTree} title="重新加载目录树">
+            ⟳ 刷新
+          </button>
+        </div>
         {tree ? (
           renderTree(tree, 0)
         ) : (
@@ -294,7 +345,11 @@ export function SftpPanel({ connId }: Props) {
                 {e.attrs.mtime ? new Date(e.attrs.mtime * 1000).toLocaleString('zh-CN') : '—'}
               </span>
               <span className="op">
-                {!e.attrs.isDirectory && (
+                {e.attrs.isDirectory ? (
+                  <button className="btn tiny" onClick={() => void del(e.filename)}>
+                    删除
+                  </button>
+                ) : (
                   <>
                     <button className="btn tiny" onClick={() => setEdit(e)}>
                       编辑
@@ -307,6 +362,9 @@ export function SftpPanel({ connId }: Props) {
                       }}
                     >
                       下载
+                    </button>
+                    <button className="btn tiny" onClick={() => void del(e.filename)}>
+                      删除
                     </button>
                   </>
                 )}
